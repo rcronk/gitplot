@@ -3,6 +3,18 @@ from __future__ import print_function
 import subprocess
 import re
 
+class GitObject(object):
+    """
+    Represents a git object.
+    """
+    def __init__(self, sha, name=None, links=None):
+        self.sha = sha
+        self.name = name
+        self.links = links
+
+    def __eq__(self, other):
+        return self.sha == other.sha
+
 class Git(object):
     """
     Represents a git repo.
@@ -22,9 +34,16 @@ class Git(object):
         output = subprocess.check_output(['git', 'rev-list', '--objects', '--all',
                                           self.path_to_repo]).decode('utf-8')
         git_objects = re.findall('^(?P<sha1>[A-Fa-f0-9]{40})?(?P<name>.*)$', output, re.MULTILINE)
+        objects = []
         for sha, name in git_objects:
             if sha:
-                print('-' * 80)
+                if sha not in objects:
+                    # TODO: Create it
+                    pass
+                else:
+                    # TODO: Find it and add connections to it?
+                    pass
+
                 print('sha: %s, name: %s' % (sha, name))
                 obj_type = subprocess.check_output(['git', 'cat-file', sha, '-t']).strip()
                 print('type: %s' % obj_type)
