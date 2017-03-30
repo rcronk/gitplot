@@ -1,14 +1,26 @@
+""" Provides some low-level git operations from scratch for learning purposes. """
 from __future__ import print_function
 import subprocess
 import re
 
 class Git(object):
+    """
+    Represents a git repo.
+    """
     def __init__(self, path_to_repo='.'):
+        """
+        Initializes the git repo class
+        :param path_to_repo: Path to the root of the git repo in question.
+        """
         self.path_to_repo = path_to_repo
 
     def get_objects(self):
-        # TODO: Use self.path_to_repo
-        output = subprocess.check_output(['git', 'rev-list', '--objects', '--all'])
+        """
+        Gets the objects in the repo.
+        :return: The objects - TBD.
+        """
+        output = subprocess.check_output(['git', 'rev-list', '--objects', '--all',
+                                          self.path_to_repo]).decode('utf-8')
         git_objects = re.findall('^(?P<sha1>[A-Fa-f0-9]{40})?(?P<name>.*)$', output, re.MULTILINE)
         for sha, name in git_objects:
             if sha:
