@@ -1,6 +1,6 @@
-from __future__ import print_function
 import unittest
 import subprocess
+import logging
 
 import git
 
@@ -9,7 +9,8 @@ class TestGit(unittest.TestCase):
     def test_get_objects(self):
         g = git.Git()
         objects = g.get_objects()
-        print(objects)
+        for git_obj in objects:
+            logging.debug(git_obj)
 
     def test_pylint(self):
         self.assertEqual(0, subprocess.call(['pylint', 'git.py']))
