@@ -36,5 +36,5 @@ nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
 node_labels = {node:node for node in G.nodes()}
 nx.draw_networkx_labels(G, pos, labels=node_labels)
 
-nx.draw(G,pos, node_color=values, node_size=1500, cmap=plt.cm.cool)
+nx.draw(G, pos, node_color=values, node_size=1500, cmap=plt.cm.cool)
 pylab.show()
