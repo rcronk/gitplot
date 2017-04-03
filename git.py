@@ -8,7 +8,7 @@ class GitObject(object):
     """
     Represents a git object.
     """
-    def __init__(self, sha, name=None, links=None, git_type=None):
+    def __init__(self, sha, name='', links=None, git_type=None):
         """ Initialize this object. """
         self._sha = sha
         self._name = name
@@ -125,18 +125,29 @@ class Git(object):
         """ Executes a git command and returns the output as a stripped string. """
         return subprocess.check_output(cmd).decode('utf-8').strip()
 
+    def get_refs(self):
+        """ Get all refs """
+        ref_objects = []
+        all_refs = self.git_cmd(['git', 'show-ref'])
+        found_refs = re.findall(r'^(?P<sha1>[A-Fa-f0-9]{40})\s(?P<ref_name>.*)$',
+                                all_refs, re.MULTILINE)  #pylint: disable=no-member
+        for sha, ref_name in found_refs:
+            ref_objects.append(GitObject(ref_name, links=[GitLink(sha, 'ref')], git_type='ref'))
+        return ref_objects
+
     def get_objects(self):
         """
         Gets the objects in the repo.
         :return: The objects - TBD.
         """
         output = self.git_cmd(['git', 'rev-list', '--objects', '--all', self.path_to_repo])
-        git_objects = re.findall('^(?P<sha1>[A-Fa-f0-9]{40})?(?P<name>.*)$', output, re.MULTILINE)
+        git_objects = re.findall('^(?P<sha1>[A-Fa-f0-9]{40})?(?P<name>.*)$',
+                                 output, re.MULTILINE)  #pylint: disable=no-member
         objects = []
         for sha, name in git_objects:
             if sha:
                 logging.debug('-' * 80)
-                logging.debug('object: %s' % sha)
+                logging.debug('object: %s', sha)
                 if sha not in objects:
                     gobj = GitObject(sha, name)
                     objects.append(gobj)
@@ -144,32 +155,34 @@ class Git(object):
                     gobj = next(x for x in objects if x == sha)
 
                 obj_type = self.git_cmd(['git', 'cat-file', sha, '-t'])
-                logging.debug('type: %s' % obj_type)
+                logging.debug('type: %s', obj_type)
                 gobj.git_type = obj_type
                 obj_content = self.git_cmd(['git', 'cat-file', sha, '-p'])
-                logging.debug('content: %s' % obj_content)
+                logging.debug('content: %s', obj_content)
 
                 if obj_type == 'commit':
                     match = re.search(r'tree (?P<tree>[A-Fa-f0-9]{40})', obj_content)
                     if match:
-                        logging.debug('tree: %s' % match.group('tree'))
+                        logging.debug('tree: %s', match.group('tree'))
                         gobj.add_link(GitLink(match.group('tree'), 'tree'))
                     else:
                         logging.debug('no tree in this commit?')
                     match = re.search(r'parent (?P<parent>[A-Fa-f0-9]{40})', obj_content)
                     if match:
-                        logging.debug('parent: %s' % match.group('parent'))
+                        logging.debug('parent: %s', match.group('parent'))
                         gobj.add_link(GitLink(match.group('parent'), 'parent'))
                     else:
                         logging.debug('no parent in this commit - first commit in repo?')
                 elif obj_type == 'tree':
-                    match = re.findall(r'[0-9]{6} blob (?P<blob>[A-Fa-f0-9]{40})\s+(?P<name>.*)', obj_content)
-                    logging.debug('blobs/names: %s' % match)
+                    match = re.findall(r'[0-9]{6} blob (?P<blob>[A-Fa-f0-9]{40})\s+(?P<name>.*)',
+                                       obj_content)
+                    logging.debug('blobs/names: %s', match)
                     for blob, name in match:
                         gobj.add_link(GitLink(blob, name))
                 elif obj_type == 'blob':
                     logging.debug('I\'m just a blob.')
-        return objects
+        refs = self.get_refs()
+        return objects + refs
 
     @property
     def path_to_repo(self):
