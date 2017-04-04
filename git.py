@@ -1,6 +1,7 @@
 """ Provides some low-level git operations from scratch for learning purposes. """
 import subprocess
 import re
+import os
 import logging
 
 
@@ -120,10 +121,15 @@ class Git(object):
         """
         self._path_to_repo = path_to_repo
 
-    @staticmethod
-    def git_cmd(cmd):
+    def git_cmd(self, cmd):
         """ Executes a git command and returns the output as a stripped string. """
-        return subprocess.check_output(cmd).decode('utf-8').strip()
+        old_dir = os.getcwd()
+        os.chdir(self.path_to_repo)
+        # TODO: utf-8 is needed on python 3, but not on python 2.  Fix this.
+        #output = subprocess.check_output(cmd).decode('utf-8').strip()
+        output = subprocess.check_output(cmd).strip()
+        os.chdir(old_dir)
+        return output
 
     def get_refs(self):
         """ Get all refs """
@@ -140,7 +146,7 @@ class Git(object):
         Gets the objects in the repo.
         :return: The objects - TBD.
         """
-        output = self.git_cmd(['git', 'rev-list', '--objects', '--all', self.path_to_repo])
+        output = self.git_cmd(['git', 'rev-list', '--objects', '--all'])
         git_objects = re.findall('^(?P<sha1>[A-Fa-f0-9]{40})?(?P<name>.*)$',
                                  output, re.MULTILINE)  #pylint: disable=no-member
         objects = []

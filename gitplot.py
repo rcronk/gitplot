@@ -19,6 +19,8 @@ types_to_include = ('blob', 'tree', 'commit', 'ref')
 #types_to_include = ('blob', 'tree')
 
 git_objects = [x for x in git.Git().get_objects() if x.git_type in types_to_include]
+#git_objects = [x for x in git.Git(r'c:\users\24860\code\git\devtools').get_objects()
+#               if x.git_type in types_to_include]
 
 for git_obj in git_objects:
     if git_obj.sha.startswith('ref'):
@@ -39,8 +41,8 @@ shells = []
 for obj_type in types_to_include:
     shells.append([x for x in G.nodes() if G.node[x]['type'] == obj_type])
 
-pos=nx.shell_layout(G, nlist=shells)
-#pos=nx.spring_layout(G, iterations=5000)
+pos = nx.shell_layout(G, nlist=shells)
+#pos = nx.spring_layout(G, iterations=5000)
 
 nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
 
