@@ -126,8 +126,8 @@ class Git(object):
         old_dir = os.getcwd()
         os.chdir(self.path_to_repo)
         # TODO: utf-8 is needed on python 3, but not on python 2.  Fix this.
-        #output = subprocess.check_output(cmd).decode('utf-8').strip()
-        output = subprocess.check_output(cmd).strip()
+        output = subprocess.check_output(cmd).decode('utf-8').strip()
+        #output = subprocess.check_output(cmd).strip()
         os.chdir(old_dir)
         return output
 
