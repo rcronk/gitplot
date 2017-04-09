@@ -18,9 +18,9 @@ G = nx.DiGraph()
 types_to_include = ('commit', 'ref')
 #types_to_include = ('blob', 'tree')
 
-#git_objects = [x for x in git.Git().get_objects() if x.git_type in types_to_include]
-git_objects = [x for x in git.Git(r'c:\users\cronk\PyCharmProjects\mutate').get_objects()
-               if x.git_type in types_to_include]
+git_objects = [x for x in git.Git().get_objects() if x.git_type in types_to_include]
+#git_objects = [x for x in git.Git(r'c:\users\cronk\PyCharmProjects\mutate').get_objects()
+#               if x.git_type in types_to_include]
 #git_objects = [x for x in git.Git(r'c:\users\24860\code\git\devtools').get_objects()
 #               if x.git_type in types_to_include]
 
