@@ -13,9 +13,9 @@ type_colors = {
 
 G = nx.DiGraph()
 
-#types_to_include = ('blob', 'tree', 'commit', 'ref')
+types_to_include = ('blob', 'tree', 'commit', 'ref')
 #types_to_include = ('tree', 'commit', 'ref')
-types_to_include = ('commit', 'ref')
+#types_to_include = ('commit', 'ref')
 #types_to_include = ('blob', 'tree')
 
 git_objects = [x for x in git.Git().get_objects() if x.git_type in types_to_include]
@@ -52,4 +52,5 @@ node_labels = {node:node for node in G.nodes()}
 nx.draw_networkx_labels(G, pos, labels=node_labels)
 
 nx.draw(G, pos, node_color=values, node_size=1500, cmap=plt.cm.rainbow)
+nx.drawing.nx_pydot.write_dot(G, 'graph.dot')
 pylab.show()
