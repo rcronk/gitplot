@@ -21,7 +21,7 @@ types_to_include = ('blob', 'tree', 'commit', 'ref')
 #types_to_include = ('blob', 'tree')
 
 #git_objects = [x for x in git.Git().get_objects() if x.git_type in types_to_include]
-git_objects = [x for x in git.Git(os.path.expandvars(r'%TEMP%\gitplot')).get_objects()
+git_objects = [x for x in git.Git(r'c:\users\24860\appdata\local\temp\temprepo-m9doza').get_objects()
                if x.git_type in types_to_include]
 #git_objects = [x for x in git.Git(r'c:\users\cronk\PyCharmProjects\mutate').get_objects()
 #               if x.git_type in types_to_include]
