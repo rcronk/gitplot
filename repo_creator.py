@@ -3,7 +3,6 @@ import os
 import tempfile
 import random
 import string
-import logging
 
 
 class RepoCreator(object):
@@ -32,8 +31,18 @@ class RepoCreator(object):
         self.run(['git', 'add', name])
         self.run(['git', 'commit', '-m', message])
 
+    def create_tag(self, name, commit='HEAD', tag_type='lightweight', message='Default message'):
+        if tag_type == 'lightweight':
+            self.run(['git', 'tag', name, commit])
+        elif tag_type == 'annotated':
+            self.run(['git', 'tag', '-a', name, commit, '-m', message])
+        else:
+            print('Invalid tag type: "%s"' % tag_type)
+
 
 r = RepoCreator()
-for filename in ('file1.txt', 'file2.txt'):
+for filename, tag_type in (('file1.txt', 'lightweight'),
+                           ('file2.txt', 'annotated')):
     r.create_file(filename)
     r.commit_file(filename)
+    r.create_tag('Tag-for-%s' % filename, tag_type=tag_type)

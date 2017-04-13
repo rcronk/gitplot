@@ -11,17 +11,18 @@ type_colors = {
     'commit': 'green',
     'tree': 'blue',
     'blob': 'black',
+    'tag': 'orange',
 }
 
 #G = nx.DiGraph()
 
-types_to_include = ('blob', 'tree', 'commit', 'ref')
+types_to_include = ('blob', 'tree', 'commit', 'ref', 'tag')
 #types_to_include = ('tree', 'commit', 'ref')
 #types_to_include = ('commit', 'ref')
 #types_to_include = ('blob', 'tree')
 
 #git_objects = [x for x in git.Git().get_objects() if x.git_type in types_to_include]
-git_objects = [x for x in git.Git(r'c:\users\24860\appdata\local\temp\temprepo-m9doza').get_objects()
+git_objects = [x for x in git.Git(r'c:\users\24860\appdata\local\temp\temprepo-wcywm9').get_objects()
                if x.git_type in types_to_include]
 #git_objects = [x for x in git.Git(r'c:\users\cronk\PyCharmProjects\mutate').get_objects()
 #               if x.git_type in types_to_include]
@@ -61,13 +62,9 @@ git_objects = [x for x in git.Git(r'c:\users\24860\appdata\local\temp\temprepo-m
 
 gv = graphviz.Digraph(format='svg')
 for git_obj in git_objects:
-    if git_obj.sha.startswith('ref'):
-        id = git_obj.sha
-    else:
-        id = git_obj.short_sha
-    gv.node(id, color=type_colors[git_obj.git_type])
+    gv.node(git_obj.identifier, color=type_colors[git_obj.git_type])
     if git_obj.links:
         for link in git_obj.links:
-            if link.sha in [x.sha for x in git_objects]:
-                gv.edge(id, link.short_sha, label=link.name)
+            if link.identifier in [x.identifier for x in git_objects]:
+                gv.edge(git_obj.identifier, link.identifier, label=link.name)
 gv.render('git')

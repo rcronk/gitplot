@@ -47,6 +47,14 @@ class GitObject(object):
         return self._sha[:4]
 
     @property
+    def identifier(self):
+        """ Return the identifier of this object. """
+        if self.git_type in ('ref', 'tag'):
+            return self.sha
+        else:
+            return self.short_sha
+
+    @property
     def name(self):
         """ Return the name of this object. """
         return self._name
@@ -74,40 +82,48 @@ class GitObject(object):
         self._links.append(link)
 
 
-class GitLink(object):
-    """
-    Represents a git object.
-    """
-    def __init__(self, sha, name=None):
-        """ Initialize this link. """
-        self._sha = sha
-        self._name = name
-
-    def __eq__(self, other):
-        """ Test if this link is equal to other. """
-        return self.sha == str(other)
-
-    def __ne__(self, other):
-        """ Test if this link is not equal to other. """
-        return self.sha != str(other)
-
-    def __str__(self):
-        return '%s:%s' % (self.sha, self.name)
-
-    @property
-    def sha(self):
-        """ Return the sha of this object. """
-        return self._sha
-
-    @property
-    def short_sha(self):
-        """ Return the short sha of this link. """
-        return self._sha[:4]
-
-    @property
-    def name(self):
-        """ Return the name of this object. """
-        return self._name
+#class GitLink(object):
+#    """
+#    Represents a git object.
+#    """
+#    def __init__(self, sha, name=None):
+#        """ Initialize this link. """
+#        self._sha = sha
+#        self._name = name
+#
+#    def __eq__(self, other):
+#        """ Test if this link is equal to other. """
+#        return self.sha == str(other)
+#
+#    def __ne__(self, other):
+#        """ Test if this link is not equal to other. """
+#        return self.sha != str(other)
+#
+#    def __str__(self):
+#        return '%s:%s' % (self.sha, self.name)
+#
+#    @property
+#    def sha(self):
+#        """ Return the sha of this object. """
+#        return self._sha
+#
+#    @property
+#    def short_sha(self):
+#        """ Return the short sha of this link. """
+#        return self._sha[:4]
+#
+#    @property
+#    def identifier(self):
+#        """ Return the identifier of this object. """
+#        if self.name in ('ref', 'tag'):
+#            return self.sha
+#        else:
+#            return self.short_sha
+#
+#    @property
+#    def name(self):
+#        """ Return the name of this object. """
+#        return self._name
 
 
 class Git(object):
@@ -135,9 +151,16 @@ class Git(object):
         all_refs = self.git_cmd(['git', 'show-ref'])
         found_refs = re.findall(r'^(?P<sha1>[A-Fa-f0-9]{40})\s(?P<ref_name>.*)$',
                                 all_refs, re.MULTILINE)  #pylint: disable=no-member
+        # TODO: git symbolic-ref HEAD
         for sha, ref_name in found_refs:
-            ref_objects.append(GitObject(ref_name, links=[GitLink(sha, 'ref')], git_type='ref'))
+            ref_objects.append(GitObject(ref_name, links=[GitObject(sha, 'ref')], git_type='ref'))
         return ref_objects
+
+    def get_object_type(self, sha):
+        return self.git_cmd(['git', 'cat-file', sha, '-t'])
+
+    def get_object_content(self, sha):
+        return self.git_cmd(['git', 'cat-file', sha, '-p'])
 
     def get_objects(self):
         """
@@ -145,7 +168,7 @@ class Git(object):
         :return: The objects - TBD.
         """
         output = self.git_cmd(['git', 'rev-list', '--objects', '--all'])
-        git_objects = re.findall('^(?P<sha1>[A-Fa-f0-9]{40})?(?P<name>.*)$',
+        git_objects = re.findall('^(?P<sha1>[A-Fa-f0-9]{40})\s(?P<name>.*)$',
                                  output, re.MULTILINE)  #pylint: disable=no-member
         objects = []
         for sha, name in git_objects:
@@ -158,33 +181,43 @@ class Git(object):
                 else:
                     gobj = next(x for x in objects if x == sha)
 
-                obj_type = self.git_cmd(['git', 'cat-file', sha, '-t'])
+                obj_type = self.get_object_type(sha)
                 logging.debug('type: %s', obj_type)
                 gobj.git_type = obj_type
-                obj_content = self.git_cmd(['git', 'cat-file', sha, '-p'])
+                obj_content = self.get_object_content(sha)
                 logging.debug('content: %s', obj_content)
 
                 if obj_type == 'commit':
                     match = re.search(r'tree (?P<tree>[A-Fa-f0-9]{40})', obj_content)
                     if match:
                         logging.debug('tree: %s', match.group('tree'))
-                        gobj.add_link(GitLink(match.group('tree'), 'tree'))
+                        gobj.add_link(GitObject(match.group('tree'), 'tree', git_type='tree'))
                     else:
                         logging.debug('no tree in this commit?')
+                    # TODO: A commit can have multiple parents.
                     match = re.search(r'parent (?P<parent>[A-Fa-f0-9]{40})', obj_content)
                     if match:
                         logging.debug('parent: %s', match.group('parent'))
-                        gobj.add_link(GitLink(match.group('parent'), 'parent'))
+                        gobj.add_link(GitObject(match.group('parent'), 'parent', git_type='commit'))
                     else:
                         logging.debug('no parent in this commit - first commit in repo?')
                 elif obj_type == 'tree':
+                    # TODO: trees can also contain other trees, not just blobs.
                     match = re.findall(r'[0-9]{6} blob (?P<blob>[A-Fa-f0-9]{40})\s+(?P<name>.*)',
                                        obj_content)
                     logging.debug('blobs/names: %s', match)
                     for blob, name in match:
-                        gobj.add_link(GitLink(blob, name))
+                        gobj.add_link(GitObject(blob, name, git_type='blob'))
                 elif obj_type == 'blob':
                     logging.debug('I\'m just a blob.')
+                elif obj_type == 'tag':
+                    match = re.search(r'object (?P<object>[A-Fa-f0-9]{40})', obj_content)
+                    if match:
+                        logging.debug('tag: %s', match.group('object'))
+                        gobj.add_link(GitObject(match.group('object'), 'tag', git_type='tag'))
+                    else:
+                        logging.debug('no object in this tag?')
+
         refs = self.get_refs()
         return objects + refs
 
