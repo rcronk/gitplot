@@ -6,9 +6,67 @@ import logging
 
 
 # Refactor
+class Repo(object):
+    """
+    Represents a git repo.
+    """
+    def __init__(self, path_to_repo='.'):
+        """
+        Initializes the git repo class
+        :param path_to_repo: Path to the root of the git repo in question.
+        """
+        self._path_to_repo = path_to_repo
+
+    @property
+    def path_to_repo(self):
+        """ Return the path to this repo. """
+        return self._path_to_repo
+
+    def git_cmd(self, cmd):
+        """ Executes a git command and returns the output as a stripped string. """
+        old_dir = os.getcwd()
+        os.chdir(self.path_to_repo)
+        output = subprocess.check_output(cmd).decode('utf-8', errors='replace').strip()
+        os.chdir(old_dir)
+        return output
+
+    def get_refs(self):
+        """ Get all refs """
+        ref_objects = []
+        all_refs = self.git_cmd(['git', 'show-ref'])
+        found_refs = re.findall(r'^(?P<sha1>[A-Fa-f0-9]{40})\s(?P<ref_name>.*)$',
+                                all_refs, re.MULTILINE)  #pylint: disable=no-member
+        # TODO: git symbolic-ref HEAD
+        for sha, ref_name in found_refs:
+            ref_objects.append(GitObject(ref_name, links=[GitObject(sha, 'ref')], git_type='ref'))
+        return ref_objects
+
+    def get_objects(self):
+        """ Get all objects """
+        all_objects = self.git_cmd(['git', 'rev-list', '--objects', '--all'])
+        git_objects = re.findall('^(?P<sha1>[A-Fa-f0-9]{40}) *(?P<name>.*)$',
+                                 all_objects, re.MULTILINE)  #pylint: disable=no-member
+        objects = []
+        for sha, name in git_objects:
+            objects.append(NewGitObject.create(sha))
+        return objects
+
 class NewGitObject(object):
-    def __init__(self, commit_id):
-        pass
+    def __init__(self, commit_id, short_length=4):
+        self._commit_id = commit_id
+        self._short_length = short_length
+        self._object_type = None
+        self._object_content = None
+        self._parents = None
+        self._children = None
+
+    @property
+    def commit_id(self):
+        return self._commit_id
+
+    @property
+    def short_commit_id(self):
+        return self._commit_id[:self._short_length]
 
     @classmethod
     def create(cls, commit_id):
@@ -31,6 +89,18 @@ class NewGitObject(object):
         os.chdir(old_dir)
         return output
 
+    @property
+    def object_type(self):
+        if self._object_type is None:
+            self._object_type = self.get_object_type(self.commit_id)
+        return self._object_type
+
+    @property
+    def object_content(self):
+        if self._object_content is None:
+            self._object_content = self.get_object_content(self.commit_id)
+        return self._object_content
+
     @classmethod
     def get_object_type(cls, commit_id):
         return cls.git_cmd(['git', 'cat-file', commit_id, '-t'])
@@ -39,11 +109,45 @@ class NewGitObject(object):
     def get_object_content(cls, commit_id):
         return cls.git_cmd(['git', 'cat-file', commit_id, '-p'])
 
+    @property
+    def parents(self):
+        raise Exception('Cannot call parents on base class!')
+
+    @property
+    def children(self):
+        raise Exception('Cannot call children on base class!')
+
 
 class Commit(NewGitObject):
     @classmethod
     def is_a(cls, commit_id):
         return cls.get_object_type(commit_id) == 'commit'
+
+    @property
+    def parents(self):
+        if self._parents is None:
+            self._parents = []
+            found_parents = re.findall(r'parent (?P<parent>[A-Fa-f0-9]{40})', self.object_content)
+            if found_parents:
+                for parent in found_parents:
+                    logging.debug('parent: %s', parent)
+                    self._parents.append(NewGitObject.create(parent))
+            else:
+                logging.debug('No parent in this commit - first commit in repo?')
+        return self._parents
+
+    @property
+    def children(self):
+        if self._children is None:
+            self._children = []
+            found_trees = re.findall(r'tree (?P<tree>[A-Fa-f0-9]{40})', self.object_content)
+            if found_trees:
+                for tree in found_trees:
+                    logging.debug('tree: %s', tree)
+                    self._children.append(NewGitObject.create(tree))
+            else:
+                raise Exception('ERROR: No tree in this commit.')
+        return self._children
 
 
 class Tree(NewGitObject):
@@ -58,7 +162,7 @@ class Blob(NewGitObject):
         return cls.get_object_type(commit_id) == 'blob'
 
 
-class Tag(NewGitObject):
+class AnnotatedTag(NewGitObject):
     @classmethod
     def is_a(cls, commit_id):
         return cls.get_object_type(commit_id) == 'tag'
