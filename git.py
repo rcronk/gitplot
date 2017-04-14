@@ -5,6 +5,85 @@ import os
 import logging
 
 
+# Refactor
+class NewGitObject(object):
+    def __init__(self, commit_id):
+        pass
+
+    @classmethod
+    def create(cls, commit_id):
+        for subclass in cls.__subclasses__():
+            if subclass.is_a(commit_id):
+                return subclass(commit_id)
+
+        raise Exception('No subclasses found for %s' % commit_id)
+
+    @classmethod
+    def is_a(cls, commit_id):
+        raise Exception('Cannot call is_a on base class!')
+
+    @staticmethod
+    def git_cmd(cmd, path_to_repo=r'c:\users\24860\appdata\local\temp\temprepo-wcywm9'):
+        """ Executes a git command and returns the output as a stripped string. """
+        old_dir = os.getcwd()
+        os.chdir(path_to_repo)
+        output = subprocess.check_output(cmd).decode('utf-8', errors='replace').strip()
+        os.chdir(old_dir)
+        return output
+
+    @classmethod
+    def get_object_type(cls, commit_id):
+        return cls.git_cmd(['git', 'cat-file', commit_id, '-t'])
+
+    @classmethod
+    def get_object_content(cls, commit_id):
+        return cls.git_cmd(['git', 'cat-file', commit_id, '-p'])
+
+
+class Commit(NewGitObject):
+    @classmethod
+    def is_a(cls, commit_id):
+        return cls.get_object_type(commit_id) == 'commit'
+
+
+class Tree(NewGitObject):
+    @classmethod
+    def is_a(cls, commit_id):
+        return cls.get_object_type(commit_id) == 'tree'
+
+
+class Blob(NewGitObject):
+    @classmethod
+    def is_a(cls, commit_id):
+        return cls.get_object_type(commit_id) == 'blob'
+
+
+class Tag(NewGitObject):
+    @classmethod
+    def is_a(cls, commit_id):
+        return cls.get_object_type(commit_id) == 'tag'
+
+
+def get_refs(self):
+    """ Get all refs """
+    ref_objects = []
+    all_refs = self.git_cmd(['git', 'show-ref'])
+    found_refs = re.findall(r'^(?P<commit_id>[A-Fa-f0-9]{40})\s(?P<ref_name>.*)$',
+                            all_refs, re.MULTILINE)  #pylint: disable=no-member
+    # TODO: git symbolic-ref HEAD
+    for commit_id, ref_name in found_refs:
+        ref_objects.append(Ref(ref_name, links=[GitObject(sha, 'ref')], git_type='ref'))
+    return ref_objects
+
+
+class Ref(object):
+    def __init__(self, ref_name, commit_id):
+        self.ref_name = ref_name
+        self.commit_id = commit_id
+
+# Refactor
+
+
 class GitObject(object):
     """
     Represents a git object.
