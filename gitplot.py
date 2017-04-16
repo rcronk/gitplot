@@ -33,7 +33,7 @@ objects = repo.get_objects()
 for git_obj in objects:
     gv.node(git_obj.short_commit_id, color=type_colors[git_obj.object_type])
     for parent in git_obj.parents:
-        gv.edge(git_obj.short_commit_id, parent.short_commit_id, label='TBD')
+        gv.edge(git_obj.short_commit_id, parent.git_object.short_commit_id, label=parent.name)
     for child in git_obj.children:
-        gv.edge(git_obj.short_commit_id, child.short_commit_id, label='TBD')
+        gv.edge(git_obj.short_commit_id, child.git_object.short_commit_id, label=child.name)
 gv.render('git')

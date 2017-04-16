@@ -51,7 +51,11 @@ class Repo(object):
             objects.append(NewGitObject.create(sha))
         return objects
 
+
 class NewGitObject(object):
+    _object_types = {}
+    _object_contents = {}
+
     def __init__(self, commit_id, short_length=4):
         self._commit_id = commit_id
         self._short_length = short_length
@@ -103,11 +107,15 @@ class NewGitObject(object):
 
     @classmethod
     def get_object_type(cls, commit_id):
-        return cls.git_cmd(['git', 'cat-file', commit_id, '-t'])
+        if commit_id not in cls._object_types:
+            cls._object_types[commit_id] = cls.git_cmd(['git', 'cat-file', commit_id, '-t'])
+        return cls._object_types[commit_id]
 
     @classmethod
     def get_object_content(cls, commit_id):
-        return cls.git_cmd(['git', 'cat-file', commit_id, '-p'])
+        if commit_id not in cls._object_contents:
+            cls._object_contents[commit_id] = cls.git_cmd(['git', 'cat-file', commit_id, '-p'])
+        return cls._object_contents[commit_id]
 
     @property
     def parents(self):
@@ -116,6 +124,12 @@ class NewGitObject(object):
     @property
     def children(self):
         raise Exception('Cannot call children on base class!')
+
+
+class Relative(object):
+    def __init__(self, git_object, name):
+        self.git_object = git_object
+        self.name = name
 
 
 class Commit(NewGitObject):
@@ -131,7 +145,7 @@ class Commit(NewGitObject):
             if found_parents:
                 for parent in found_parents:
                     logging.debug('parent: %s', parent)
-                    self._parents.append(NewGitObject.create(parent))
+                    self._parents.append(Relative(NewGitObject.create(parent), 'parent'))
             else:
                 logging.debug('No parent in this commit - first commit in repo?')
         return self._parents
@@ -144,7 +158,7 @@ class Commit(NewGitObject):
             if found_trees:
                 for tree in found_trees:
                     logging.debug('tree: %s', tree)
-                    self._children.append(NewGitObject.create(tree))
+                    self._children.append(Relative(NewGitObject.create(tree), 'tree'))
             else:
                 raise Exception('ERROR: No tree in this commit.')
         return self._children
@@ -166,13 +180,19 @@ class Tree(NewGitObject):
     def children(self):
         if self._children is None:
             self._children = []
-            # TODO: trees can also contain other trees, not just blobs.
+            # Find blobs
             match = re.findall(r'[0-9]{6} blob (?P<blob>[A-Fa-f0-9]{40})\s+(?P<name>.*)',
                                self.object_content)
             logging.debug('blobs/names: %s', match)
             for blob, name in match:
-                # TODO: we need to insert the name somehow
-                self._children.append(NewGitObject.create(blob))
+                self._children.append(Relative(NewGitObject.create(blob), name))
+            # TODO: Test this - maybe combine blob/tree matching since they're so similar
+            # Find trees
+            match = re.findall(r'[0-9]{6} tree (?P<tree>[A-Fa-f0-9]{40})\s+(?P<name>.*)',
+                               self.object_content)
+            logging.debug('trees/names: %s', match)
+            for tree, name in match:
+                self._children.append(Relative(NewGitObject.create(tree), name))
         return self._children
 
 
@@ -215,7 +235,7 @@ class AnnotatedTag(NewGitObject):
             match = re.search(r'object (?P<object>[A-Fa-f0-9]{40})', self.object_content)
             if match:
                 logging.debug('tag: %s', match.group('object'))
-                self._children.append(NewGitObject.create(match.group('object')))
+                self._children.append(Relative(NewGitObject.create(match.group('object')), 'tag'))
             else:
                 logging.debug('no object in this tag?')
         return self._children
