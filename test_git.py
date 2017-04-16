@@ -6,12 +6,6 @@ import git
 
 
 class TestGit(unittest.TestCase):
-    def test_get_objects(self):
-        g = git.Git()
-        objects = g.get_objects()
-        for git_obj in objects:
-            logging.debug(git_obj)
-
     def test_new_git_object(self):
         # Test the object factory
 #        for commit_id, obj_type in (

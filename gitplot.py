@@ -15,19 +15,10 @@ types_to_include = ('blob', 'tree', 'commit', 'ref', 'tag')
 # types_to_include = ('commit', 'ref')
 # types_to_include = ('blob', 'tree')
 
-# git_objects = [x for x in git.Git().get_objects() if x.git_type in types_to_include]
-# git_objects = [x for x in git.Git(r'c:\users\24860\appdata\local\temp\temprepo-wcywm9').get_objects()
-#                if x.git_type in types_to_include]
-# git_objects = [x for x in git.Git(r'c:\users\cronk\PyCharmProjects\mutate').get_objects()
-#               if x.git_type in types_to_include]
-# git_objects = [x for x in git.Git(r'c:\users\24860\code\git\devtools').get_objects()
-#               if x.git_type in types_to_include]
-
-
 gv = graphviz.Digraph(format='svg')
 
-#repo = git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k')
-repo = git.Repo()
+repo = git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k')
+#repo = git.Repo()
 
 objects = repo.get_objects()
 
