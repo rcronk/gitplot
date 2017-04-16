@@ -5,6 +5,12 @@ import os
 import logging
 
 
+class Ref(object):
+    def __init__(self, ref_name, commit_id):
+        self.ref_name = ref_name
+        self.commit_id = commit_id
+
+
 # Refactor
 class Repo(object):
     """
@@ -36,9 +42,12 @@ class Repo(object):
         all_refs = self.git_cmd(['git', 'show-ref'])
         found_refs = re.findall(r'^(?P<sha1>[A-Fa-f0-9]{40})\s(?P<ref_name>.*)$',
                                 all_refs, re.MULTILINE)  #pylint: disable=no-member
-        # TODO: git symbolic-ref HEAD
+        # TODO: use the same short commit_id length as git objects below
         for sha, ref_name in found_refs:
-            ref_objects.append(GitObject(ref_name, links=[GitObject(sha, 'ref')], git_type='ref'))
+            ref_objects.append(Ref(ref_name, sha[:4]))
+
+        head = self.git_cmd(['git', 'symbolic-ref', 'HEAD'])
+        ref_objects.append(Ref('HEAD', head))
         return ref_objects
 
     def get_objects(self):
@@ -85,7 +94,8 @@ class NewGitObject(object):
         raise Exception('Cannot call is_a on base class!')
 
     @staticmethod
-    def git_cmd(cmd, path_to_repo=r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k'):
+#    def git_cmd(cmd, path_to_repo=r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k'):
+    def git_cmd(cmd, path_to_repo=r'.'):
         """ Executes a git command and returns the output as a stripped string. """
         old_dir = os.getcwd()
         os.chdir(path_to_repo)
@@ -186,7 +196,7 @@ class Tree(NewGitObject):
             logging.debug('blobs/names: %s', match)
             for blob, name in match:
                 self._children.append(Relative(NewGitObject.create(blob), name))
-            # TODO: Test this - maybe combine blob/tree matching since they're so similar
+            # TODO: Maybe combine blob/tree matching since they're so similar
             # Find trees
             match = re.findall(r'[0-9]{6} tree (?P<tree>[A-Fa-f0-9]{40})\s+(?P<name>.*)',
                                self.object_content)
