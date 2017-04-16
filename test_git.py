@@ -25,18 +25,27 @@ class TestGit(unittest.TestCase):
 #                                   ):
 #            self.assertEqual(type(git.NewGitObject.create(commit_id)), obj_type)
 
-        commit = git.NewGitObject.create('e8ba')
+        commit = git.NewGitObject.create('18e8')
         self.assertEqual(commit.object_type, 'commit')
         self.assertEqual(len(commit.parents), 1)
-        self.assertEqual(commit.parents[0].commit_id, '3af89816588d95480873a4f12d63b243625fe93e')
+        self.assertEqual(commit.parents[0].commit_id, '948549522ae6dd63c318d0d13532be8e1ffa5a4b')
         self.assertEqual(len(commit.children), 1)
-        self.assertEqual(commit.children[0].commit_id, '40ef44cf8bc4c7277ec108625bbbb09b5e5a3b82')
+        self.assertEqual(commit.children[0].commit_id, '88492f905c97437264642429d353cc34daf66112')
 
-        objects = git.Repo(r'c:\users\24860\appdata\local\temp\temprepo-wcywm9').get_objects()
+        objects = git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k').get_objects()
         print(objects)
         self.assertEqual(len(objects), 7)
         self.assertEqual(objects[0].object_type, 'commit')
-        self.assertEqual(len(objects[0].object_content), 242)
+        self.assertEqual(objects[0].commit_id, '18e88e2827fda8c626b032eb59d4edbb8522ae72')
+        self.assertEqual(len(objects[0].object_content), 216)
+        self.assertEqual(len(objects[0].parents), 1)
+        self.assertEqual(objects[0].parents[0].commit_id, '948549522ae6dd63c318d0d13532be8e1ffa5a4b')
+        self.assertEqual(objects[1].object_type, 'commit')
+        self.assertEqual(objects[1].commit_id, '948549522ae6dd63c318d0d13532be8e1ffa5a4b')
+        self.assertEqual(len(objects[1].object_content), 168)
+        self.assertEqual(len(objects[1].parents), 0)
+        self.assertEqual(len(commit.children), 1)
+        self.assertEqual(commit.children[0].commit_id, '88492f905c97437264642429d353cc34daf66112')
 
 
     def test_pylint(self):

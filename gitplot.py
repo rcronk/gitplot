@@ -26,14 +26,14 @@ types_to_include = ('blob', 'tree', 'commit', 'ref', 'tag')
 
 gv = graphviz.Digraph(format='svg')
 
-repo = git.Git(r'c:\users\24860\appdata\local\temp\temprepo-wcywm9')
+repo = git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k')
 
 objects = repo.get_objects()
 
-for git_obj in git_objects:
-    gv.node(git_obj.identifier, color=type_colors[git_obj.git_type])
-    if git_obj.links:
-        for link in git_obj.links:
-            if link.identifier in [x.identifier for x in git_objects]:
-                gv.edge(git_obj.identifier, link.identifier, label=link.name)
+for git_obj in objects:
+    gv.node(git_obj.short_commit_id, color=type_colors[git_obj.object_type])
+    for parent in git_obj.parents:
+        gv.edge(git_obj.short_commit_id, parent.short_commit_id, label='TBD')
+    for child in git_obj.children:
+        gv.edge(git_obj.short_commit_id, child.short_commit_id, label='TBD')
 gv.render('git')

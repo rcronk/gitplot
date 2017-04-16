@@ -81,7 +81,7 @@ class NewGitObject(object):
         raise Exception('Cannot call is_a on base class!')
 
     @staticmethod
-    def git_cmd(cmd, path_to_repo=r'c:\users\24860\appdata\local\temp\temprepo-wcywm9'):
+    def git_cmd(cmd, path_to_repo=r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k'):
         """ Executes a git command and returns the output as a stripped string. """
         old_dir = os.getcwd()
         os.chdir(path_to_repo)
@@ -155,11 +155,45 @@ class Tree(NewGitObject):
     def is_a(cls, commit_id):
         return cls.get_object_type(commit_id) == 'tree'
 
+    @property
+    def parents(self):
+        if self._parents is None:
+            # Trees don't specify parents
+            self._parents = []
+        return self._parents
+
+    @property
+    def children(self):
+        if self._children is None:
+            self._children = []
+            # TODO: trees can also contain other trees, not just blobs.
+            match = re.findall(r'[0-9]{6} blob (?P<blob>[A-Fa-f0-9]{40})\s+(?P<name>.*)',
+                               self.object_content)
+            logging.debug('blobs/names: %s', match)
+            for blob, name in match:
+                # TODO: we need to insert the name somehow
+                self._children.append(NewGitObject.create(blob))
+        return self._children
+
 
 class Blob(NewGitObject):
     @classmethod
     def is_a(cls, commit_id):
         return cls.get_object_type(commit_id) == 'blob'
+
+    @property
+    def parents(self):
+        if self._parents is None:
+            # Blobs don't specify parents
+            self._parents = []
+        return self._parents
+
+    @property
+    def children(self):
+        if self._children is None:
+            # Blobs don't have children
+            self._children = []
+        return self._children
 
 
 class AnnotatedTag(NewGitObject):
@@ -167,6 +201,24 @@ class AnnotatedTag(NewGitObject):
     def is_a(cls, commit_id):
         return cls.get_object_type(commit_id) == 'tag'
 
+    @property
+    def parents(self):
+        if self._parents is None:
+            # Tags don't specify parents
+            self._parents = []
+        return self._parents
+
+    @property
+    def children(self):
+        if self._children is None:
+            self._children = []
+            match = re.search(r'object (?P<object>[A-Fa-f0-9]{40})', self.object_content)
+            if match:
+                logging.debug('tag: %s', match.group('object'))
+                self._children.append(NewGitObject.create(match.group('object')))
+            else:
+                logging.debug('no object in this tag?')
+        return self._children
 
 def get_refs(self):
     """ Get all refs """
