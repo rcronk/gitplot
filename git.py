@@ -94,7 +94,9 @@ class NewGitObject(object):
 
     # TODO: This path default shouldn't be here
     @staticmethod
-    def git_cmd(cmd, path_to_repo=r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k'):
+#    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k'):
+#    def git_cmd(cmd, path_to_repo=r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k'):
+    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\code\git\gitplot'):
 #    def git_cmd(cmd, path_to_repo=r'.'):
         """ Executes a git command and returns the output as a stripped string. """
         old_dir = os.getcwd()
@@ -142,10 +144,39 @@ class Relative(object):
         self.name = name
 
 
-class Commit(NewGitObject):
+class AnnotatedTag(NewGitObject):
+    object_type_text = 'tag'
+
     @classmethod
     def is_a(cls, commit_id):
-        return cls.get_object_type(commit_id) == 'commit'
+        return cls.get_object_type(commit_id) == cls.object_type_text
+
+    @property
+    def parents(self):
+        if self._parents is None:
+            # Tags don't specify parents
+            self._parents = []
+        return self._parents
+
+    @property
+    def children(self):
+        if self._children is None:
+            self._children = []
+            match = re.search(r'object (?P<object>[A-Fa-f0-9]{40})', self.object_content)
+            if match:
+                logging.debug('tag: %s', match.group('object'))
+                self._children.append(Relative(NewGitObject.create(match.group('object')), 'tag'))
+            else:
+                logging.debug('no object in this tag?')
+        return self._children
+
+
+class Commit(NewGitObject):
+    object_type_text = 'commit'
+
+    @classmethod
+    def is_a(cls, commit_id):
+        return cls.get_object_type(commit_id) == cls.object_type_text
 
     @property
     def parents(self):
@@ -175,9 +206,11 @@ class Commit(NewGitObject):
 
 
 class Tree(NewGitObject):
+    object_type_text = 'tree'
+
     @classmethod
     def is_a(cls, commit_id):
-        return cls.get_object_type(commit_id) == 'tree'
+        return cls.get_object_type(commit_id) == cls.object_type_text
 
     @property
     def parents(self):
@@ -207,9 +240,11 @@ class Tree(NewGitObject):
 
 
 class Blob(NewGitObject):
+    object_type_text = 'blob'
+
     @classmethod
     def is_a(cls, commit_id):
-        return cls.get_object_type(commit_id) == 'blob'
+        return cls.get_object_type(commit_id) == cls.object_type_text
 
     @property
     def parents(self):
@@ -225,30 +260,6 @@ class Blob(NewGitObject):
             self._children = []
         return self._children
 
-
-class AnnotatedTag(NewGitObject):
-    @classmethod
-    def is_a(cls, commit_id):
-        return cls.get_object_type(commit_id) == 'tag'
-
-    @property
-    def parents(self):
-        if self._parents is None:
-            # Tags don't specify parents
-            self._parents = []
-        return self._parents
-
-    @property
-    def children(self):
-        if self._children is None:
-            self._children = []
-            match = re.search(r'object (?P<object>[A-Fa-f0-9]{40})', self.object_content)
-            if match:
-                logging.debug('tag: %s', match.group('object'))
-                self._children.append(Relative(NewGitObject.create(match.group('object')), 'tag'))
-            else:
-                logging.debug('no object in this tag?')
-        return self._children
 
 def get_refs(self):
     """ Get all refs """
