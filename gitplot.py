@@ -28,7 +28,7 @@ gv = graphviz.Digraph(format='svg')
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 # repo = git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k')
-repo = git.Repo(r'C:\Users\24860\code\git\gitplot')
+repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo()
 
 objects = repo.get_objects()

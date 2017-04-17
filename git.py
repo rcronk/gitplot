@@ -96,7 +96,7 @@ class NewGitObject(object):
     @staticmethod
 #    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k'):
 #    def git_cmd(cmd, path_to_repo=r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k'):
-    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\code\git\gitplot'):
+    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\code\git\devtools'):
 #    def git_cmd(cmd, path_to_repo=r'.'):
         """ Executes a git command and returns the output as a stripped string. """
         old_dir = os.getcwd()
