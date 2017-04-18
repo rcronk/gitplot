@@ -19,7 +19,7 @@ class TestGit(unittest.TestCase):
 #                                   ):
 #            self.assertEqual(type(git.NewGitObject.create(commit_id)), obj_type)
 
-        commit = git.NewGitObject.create('18e8')
+        commit = git.GitObject.create('18e8')
         self.assertEqual(commit.object_type, 'commit')
         self.assertEqual(len(commit.parents), 1)
         self.assertEqual(commit.parents[0].commit_id, '948549522ae6dd63c318d0d13532be8e1ffa5a4b')

@@ -41,9 +41,8 @@ class Repo(object):
         all_refs = self.git_cmd(['git', 'show-ref'])
         found_refs = re.findall(r'^(?P<sha1>[A-Fa-f0-9]{40})\s(?P<ref_name>.*)$',
                                 all_refs, re.MULTILINE)  #pylint: disable=no-member
-        # TODO: use the same short commit_id length as git objects below
         for sha, ref_name in found_refs:
-            ref_objects.append(Ref(ref_name, sha[:4]))
+            ref_objects.append(Ref(ref_name, sha))
 
         head = self.git_cmd(['git', 'symbolic-ref', 'HEAD'])
         ref_objects.append(Ref('HEAD', head))
@@ -56,29 +55,27 @@ class Repo(object):
                                  all_objects, re.MULTILINE)  #pylint: disable=no-member
         objects = []
         for sha, name in git_objects:
-            objects.append(NewGitObject.create(sha))
+            objects.append(GitObject.create(sha))
         return objects
 
 
-class NewGitObject(object):
+class GitObject(object):
     _object_types = {}
     _object_contents = {}
 
-    def __init__(self, commit_id, short_length=4):
+    def __init__(self, commit_id):
         self._commit_id = commit_id
-        self._short_length = short_length
         self._object_type = None
         self._object_content = None
         self._parents = None
         self._children = None
 
+    def __str__(self):
+        return self.commit_id
+
     @property
     def commit_id(self):
         return self._commit_id
-
-    @property
-    def short_commit_id(self):
-        return self._commit_id[:self._short_length]
 
     @classmethod
     def create(cls, commit_id):
@@ -96,8 +93,8 @@ class NewGitObject(object):
     @staticmethod
 #    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k'):
 #    def git_cmd(cmd, path_to_repo=r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k'):
-    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\code\git\devtools'):
-#    def git_cmd(cmd, path_to_repo=r'.'):
+#    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\code\git\devtools'):
+    def git_cmd(cmd, path_to_repo=r'.'):
         """ Executes a git command and returns the output as a stripped string. """
         old_dir = os.getcwd()
         os.chdir(path_to_repo)
@@ -144,7 +141,7 @@ class Relative(object):
         self.name = name
 
 
-class AnnotatedTag(NewGitObject):
+class AnnotatedTag(GitObject):
     object_type_text = 'tag'
 
     @classmethod
@@ -165,13 +162,13 @@ class AnnotatedTag(NewGitObject):
             match = re.search(r'object (?P<object>[A-Fa-f0-9]{40})', self.object_content)
             if match:
                 logging.debug('tag: %s', match.group('object'))
-                self._children.append(Relative(NewGitObject.create(match.group('object')), 'tag'))
+                self._children.append(Relative(GitObject.create(match.group('object')), 'tag'))
             else:
                 logging.debug('no object in this tag?')
         return self._children
 
 
-class Commit(NewGitObject):
+class Commit(GitObject):
     object_type_text = 'commit'
 
     @classmethod
@@ -186,7 +183,7 @@ class Commit(NewGitObject):
             if found_parents:
                 for parent in found_parents:
                     logging.debug('parent: %s', parent)
-                    self._parents.append(Relative(NewGitObject.create(parent), 'parent'))
+                    self._parents.append(Relative(GitObject.create(parent), 'parent'))
             else:
                 logging.debug('No parent in this commit - first commit in repo?')
         return self._parents
@@ -199,13 +196,39 @@ class Commit(NewGitObject):
             if found_trees:
                 for tree in found_trees:
                     logging.debug('tree: %s', tree)
-                    self._children.append(Relative(NewGitObject.create(tree), 'tree'))
+                    self._children.append(Relative(GitObject.create(tree), 'tree'))
             else:
                 raise Exception('ERROR: No tree in this commit.')
         return self._children
 
 
-class Tree(NewGitObject):
+class CommitSummary(GitObject):
+    object_type_text = 'commitsummary'
+
+    def __init__(self, first_commit_id, last_commit_id, commits, parents):
+        super().__init__(first_commit_id)
+        self._parents = parents
+        self.commits = commits
+        self.last_commit_id = last_commit_id
+
+    @classmethod
+    def is_a(cls, commit_id):
+        return False
+
+    @property
+    def commit_id(self):
+        return '%s (%s) %s' % (self._commit_id, self.commits, self.last_commit_id)
+
+    @property
+    def parents(self):
+        return self._parents
+
+    @property
+    def children(self):
+        return []
+
+
+class Tree(GitObject):
     object_type_text = 'tree'
 
     @classmethod
@@ -228,18 +251,18 @@ class Tree(NewGitObject):
                                self.object_content)
             logging.debug('blobs/names: %s', match)
             for blob, name in match:
-                self._children.append(Relative(NewGitObject.create(blob), name))
+                self._children.append(Relative(GitObject.create(blob), name))
             # TODO: Maybe combine blob/tree matching since they're so similar
             # Find trees
             match = re.findall(r'[0-9]{6} tree (?P<tree>[A-Fa-f0-9]{40})\s+(?P<name>.*)',
                                self.object_content)
             logging.debug('trees/names: %s', match)
             for tree, name in match:
-                self._children.append(Relative(NewGitObject.create(tree), name))
+                self._children.append(Relative(GitObject.create(tree), name))
         return self._children
 
 
-class Blob(NewGitObject):
+class Blob(GitObject):
     object_type_text = 'blob'
 
     @classmethod
@@ -277,3 +300,6 @@ class Ref(object):
     def __init__(self, ref_name, commit_id):
         self.ref_name = ref_name
         self.commit_id = commit_id
+
+    def __str__(self):
+        return '%s:%s' % (self.ref_name, self.commit_id)
