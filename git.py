@@ -91,10 +91,9 @@ class GitObject(object):
 
     # TODO: This path default shouldn't be here
     @staticmethod
-#    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k'):
-#    def git_cmd(cmd, path_to_repo=r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k'):
+    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k'):
 #    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\code\git\devtools'):
-    def git_cmd(cmd, path_to_repo=r'.'):
+#    def git_cmd(cmd, path_to_repo=r'.'):
         """ Executes a git command and returns the output as a stripped string. """
         old_dir = os.getcwd()
         os.chdir(path_to_repo)
