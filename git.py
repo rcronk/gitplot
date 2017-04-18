@@ -205,7 +205,7 @@ class CommitSummary(GitObject):
     object_type_text = 'commitsummary'
 
     def __init__(self, first_commit_id, last_commit_id, commits, parents):
-        super().__init__(first_commit_id)
+        GitObject.__init__(self, first_commit_id)
         self._parents = parents
         self.commits = commits
         self.last_commit_id = last_commit_id
