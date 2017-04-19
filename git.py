@@ -150,20 +150,20 @@ class AnnotatedTag(GitObject):
     @property
     def parents(self):
         if self._parents is None:
-            # Tags don't specify parents
             self._parents = []
+            match = re.search(r'object (?P<object>[A-Fa-f0-9]{40})', self.object_content)
+            if match:
+                logging.debug('tag: %s', match.group('object'))
+                self._parents.append(Relative(GitObject.create(match.group('object')), 'tag'))
+            else:
+                logging.debug('no object in this tag?')
         return self._parents
 
     @property
     def children(self):
         if self._children is None:
+            # Annotated tags don't have children
             self._children = []
-            match = re.search(r'object (?P<object>[A-Fa-f0-9]{40})', self.object_content)
-            if match:
-                logging.debug('tag: %s', match.group('object'))
-                self._children.append(Relative(GitObject.create(match.group('object')), 'tag'))
-            else:
-                logging.debug('no object in this tag?')
         return self._children
 
 
@@ -207,11 +207,11 @@ class CommitSummary(GitObject):
     def __init__(self, first_commit_id, last_commit_id, commits, parents):
         GitObject.__init__(self, first_commit_id)
         self._parents = parents
-        self.commits = commits
-        self.last_commit_id = last_commit_id
+        self._commits = commits
+        self._last_commit_id = last_commit_id
 
     def __str__(self):
-        return '%s (%s) %s' % (self._commit_id[:4], self.commits, self.last_commit_id[:4])
+        return '%s (%s) %s' % (self._commit_id, self._commits, self._last_commit_id)
 
     @classmethod
     def is_a(cls, commit_id):
@@ -220,6 +220,14 @@ class CommitSummary(GitObject):
     @property
     def commit_id(self):
         return self._commit_id
+
+    @property
+    def last_commit_id(self):
+        return self._last_commit_id
+
+    @property
+    def commits(self):
+        return self._commits
 
     @property
     def object_type(self):

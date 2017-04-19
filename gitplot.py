@@ -23,7 +23,8 @@ for subclass in subclasses:
 # types_to_include = ('tree', 'commit', 'ref', 'tag')
 types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('blob', 'tree')
-collapse_commits = False  # This isn't working yet.
+
+collapse_commits = True  # This isn't working yet.
 
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
@@ -57,41 +58,45 @@ if collapse_commits:
             obj = objects[obj_index]
             collapsing = False
             first_commit_id = None
-            last_parents = None
+            last_obj = None
             commits = 0
             while obj.parents:
                 obj_index = [x.commit_id for x in objects].index(obj.commit_id)
                 obj = objects[obj_index]
-                assert(obj.object_type == 'commit')
-                in_refs = len([x for x in refs if x.commit_id == obj.commit_id]) > 0
-                num_children = len([x for x in objects if obj.commit_id in [y.git_object.commit_id for y in x.parents]])
-                num_parents = len(obj.parents)
-                if collapsing:
-                    if num_parents == 1 and num_children == 1 and not in_refs:
-                        commits += 1
-                        objects_to_delete.append(obj_index)
+                if obj_index not in objects_to_delete and obj.object_type in ('commit', 'tag'):  #skips summarized and already processed commits
+                    in_refs = len([x for x in refs if x.commit_id == obj.commit_id]) > 0
+                    num_children = len([x for x in objects if obj.commit_id in [y.git_object.commit_id for y in x.parents]])
+                    num_parents = len(obj.parents)
+                    if collapsing:
+                        if num_parents == 1 and num_children == 1 and not in_refs:
+                            commits += 1
+                            objects_to_delete.append(obj_index)
+                        else:
+                            if commits == 1:
+                                objects_to_delete.pop()
+                            else:
+                                objects.append(git.CommitSummary(first_commit_id, last_obj.commit_id, commits, last_obj.parents))
+                            collapsing = False
+                            first_commit_id = None
                     else:
-                        objects.append(git.CommitSummary(first_commit_id, obj.commit_id, commits, last_parents))
-                        collapsing = False
-                        first_commit_id = None
-                else:
-                    if num_parents == 1 and num_children == 1 and not in_refs:
-                        collapsing = True
-                        commits = 1
-                        first_commit_id = obj.commit_id
-                        objects_to_delete.append(obj_index)
-                last_parents = obj.parents
+                        if num_parents == 1 and num_children == 1 and not in_refs:
+                            collapsing = True
+                            commits = 1
+                            first_commit_id = obj.commit_id
+                            objects_to_delete.append(obj_index)
+                last_obj = obj
                 obj = obj.parents[0].git_object
             if collapsing:
                 objects.append(git.CommitSummary(first_commit_id, obj.commit_id, commits, obj.parents))
-    objects_to_delete.sort(reverse=True)  # Need to reverse sort so we delete from end to start so indexes don't change
+    objects_to_delete = list(set(objects_to_delete))  # Need to reverse sort so we delete from end to start so indexes don't change.
+    objects_to_delete.sort(reverse=True)  # Make unique.
     for index in objects_to_delete:
         del objects[index]
 
 for git_obj in objects:
     if git_obj.object_type in types_to_include:
         if git_obj.object_type == 'commitsummary':
-            label = str(git_obj)
+            label = '%s (%s) %s' % (git_obj.last_commit_id[:4], git_obj.commits, git_obj.commit_id[:4])
         else:
             label = git_obj.commit_id[:4]
         gv.node(git_obj.commit_id,
