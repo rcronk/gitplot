@@ -21,9 +21,9 @@ for subclass in subclasses:
 
 # types_to_include = ('blob', 'tree', 'commit', 'ref', 'tag')
 # types_to_include = ('tree', 'commit', 'ref', 'tag')
-types_to_include = ('commit', 'ref', 'tag')
+types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('blob', 'tree')
-collapse_commits = True  # This isn't working yet.
+collapse_commits = False  # This isn't working yet.
 
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
@@ -69,10 +69,9 @@ if collapse_commits:
                 if collapsing:
                     if num_parents == 1 and num_children == 1 and not in_refs:
                         commits += 1
-                        objects_to_delete.append(obj)
+                        objects_to_delete.append(obj_index)
                     else:
-                        objects.insert(obj_index, git.CommitSummary(first_commit_id, obj.commit_id,
-                                                                    commits, last_parents))
+                        objects.append(git.CommitSummary(first_commit_id, obj.commit_id, commits, last_parents))
                         collapsing = False
                         first_commit_id = None
                 else:
@@ -80,16 +79,23 @@ if collapse_commits:
                         collapsing = True
                         commits = 1
                         first_commit_id = obj.commit_id
-                        objects_to_delete.append(obj)
+                        objects_to_delete.append(obj_index)
                 last_parents = obj.parents
                 obj = obj.parents[0].git_object
             if collapsing:
-                objects.insert(obj_index, git.CommitSummary(first_commit_id, obj.commit_id, commits, obj.parents))
+                objects.append(git.CommitSummary(first_commit_id, obj.commit_id, commits, obj.parents))
+    objects_to_delete.sort(reverse=True)  # Need to reverse sort so we delete from end to start so indexes don't change
+    for index in objects_to_delete:
+        del objects[index]
 
 for git_obj in objects:
     if git_obj.object_type in types_to_include:
+        if git_obj.object_type == 'commitsummary':
+            label = str(git_obj)
+        else:
+            label = git_obj.commit_id[:4]
         gv.node(git_obj.commit_id,
-                label=git_obj.commit_id[:4],
+                label=label,
                 color=type_colors[git_obj.object_type].line_color,
                 style='filled',
                 fillcolor=type_colors[git_obj.object_type].fill_color,

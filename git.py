@@ -210,13 +210,20 @@ class CommitSummary(GitObject):
         self.commits = commits
         self.last_commit_id = last_commit_id
 
+    def __str__(self):
+        return '%s (%s) %s' % (self._commit_id[:4], self.commits, self.last_commit_id[:4])
+
     @classmethod
     def is_a(cls, commit_id):
         return False
 
     @property
     def commit_id(self):
-        return '%s (%s) %s' % (self._commit_id, self.commits, self.last_commit_id)
+        return self._commit_id
+
+    @property
+    def object_type(self):
+        return self.object_type_text
 
     @property
     def parents(self):
