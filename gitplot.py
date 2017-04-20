@@ -10,13 +10,13 @@ class Colors(object):
 
 
 type_colors = {}
-subclasses = ['ref'] + [x.object_type_text for x in git.GitObject.__subclasses__()]
-hue_step = 1.0 / len(subclasses)
+object_types = git.Repo.get_all_object_types()
+hue_step = 1.0 / len(object_types)
 hue = 0.000
-for subclass in subclasses:
+for object_type in object_types:
     line = '%1.3f %1.3f %1.3f' % (hue, 1, 1)
     fill = '%1.3f %1.3f %1.3f' % (hue, 0.1, 1)
-    type_colors[subclass] = Colors(line, fill)
+    type_colors[object_type] = Colors(line, fill)
     hue += hue_step
 
 # types_to_include = ('blob', 'tree', 'commit', 'ref', 'tag')

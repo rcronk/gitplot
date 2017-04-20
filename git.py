@@ -21,6 +21,7 @@ class Repo(object):
         :param path_to_repo: Path to the root of the git repo in question.
         """
         self._path_to_repo = path_to_repo
+        GitObject.set_path_to_repo(path_to_repo)
 
     @property
     def path_to_repo(self):
@@ -58,10 +59,15 @@ class Repo(object):
             objects.append(GitObject.create(sha))
         return objects
 
+    @staticmethod
+    def get_all_object_types():
+        return ['ref'] + [x.object_type_text for x in GitObject.__subclasses__()]
+
 
 class GitObject(object):
     _object_types = {}
     _object_contents = {}
+    _path_to_repo = None
 
     def __init__(self, commit_id):
         self._commit_id = commit_id
@@ -86,17 +92,18 @@ class GitObject(object):
         raise Exception('No subclasses found for %s' % commit_id)
 
     @classmethod
+    def set_path_to_repo(cls, path_to_repo):
+        cls._path_to_repo = path_to_repo
+
+    @classmethod
     def is_a(cls, commit_id):
         raise Exception('Cannot call is_a on base class!')
 
-    # TODO: This path default shouldn't be here
-    @staticmethod
-    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k'):
-#    def git_cmd(cmd, path_to_repo=r'C:\Users\24860\code\git\devtools'):
-#    def git_cmd(cmd, path_to_repo=r'.'):
+    @classmethod
+    def git_cmd(cls, cmd):
         """ Executes a git command and returns the output as a stripped string. """
         old_dir = os.getcwd()
-        os.chdir(path_to_repo)
+        os.chdir(cls._path_to_repo)
         output = subprocess.check_output(cmd).decode('utf-8', errors='replace').strip()
         os.chdir(old_dir)
         return output
