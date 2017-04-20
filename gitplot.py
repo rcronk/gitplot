@@ -29,8 +29,8 @@ collapse_commits = True  # This isn't working yet.
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
-repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-# repo = git.Repo(r'C:\Users\24860\code\git\devtools')
+# repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo()
 
 objects = repo.get_objects()
