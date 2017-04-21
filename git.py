@@ -59,6 +59,16 @@ class Repo(object):
             objects.append(GitObject.create(sha))
         return objects
 
+    def get_commits(self):
+        """ Get all objects """
+        all_commits = self.git_cmd(['git', 'log', '--format=oneline', '--all'])
+        git_commits = re.findall('^(?P<sha1>[A-Fa-f0-9]{40}).*$',
+                                 all_commits, re.MULTILINE)  #pylint: disable=no-member
+        objects = []
+        for sha in git_commits:
+            objects.append(Commit(sha))
+        return objects
+
     @staticmethod
     def get_all_object_types():
         return ['ref'] + [x.object_type_text for x in GitObject.__subclasses__()]

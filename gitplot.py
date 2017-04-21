@@ -33,7 +33,10 @@ gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit o
 repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo()
 
-objects = repo.get_objects()
+if {'tree', 'blob'} & set(types_to_include):
+    objects = repo.get_objects()
+else:
+    objects = repo.get_commits()
 
 if collapse_commits:
     # Trace back from each ref back to the first commit, deleting commits with single parents, etc. to just show
@@ -48,7 +51,8 @@ if collapse_commits:
             while obj.parents:
                 if len(obj.parents) != 1:
                     for parent in obj.parents[1:]:
-                        secondary_parents.append(git.Ref('secondary_head', obj.commit_id))
+                        if parent not in secondary_parents:
+                            secondary_parents.append(git.Ref('secondary_head', parent.git_object.commit_id))
                 obj = obj.parents[0].git_object
 
     objects_to_delete = []
@@ -57,6 +61,9 @@ if collapse_commits:
             obj_index = [x.commit_id for x in objects].index(ref.commit_id)
             obj = objects[obj_index]
             collapsing = False
+            in_refs = None
+            num_children = None
+            num_parents = None
             first_commit_id = None
             last_obj = None
             commits = 0
@@ -87,7 +94,10 @@ if collapse_commits:
                 last_obj = obj
                 obj = obj.parents[0].git_object
             if collapsing:
-                objects.append(git.CommitSummary(first_commit_id, obj.commit_id, commits, obj.parents))
+                if num_parents == 1 and num_children == 1 and not in_refs:
+                    commits += 1
+                    objects_to_delete.append(obj_index)
+                objects.append(git.CommitSummary(first_commit_id, last_obj.commit_id, commits, last_obj.parents))
     objects_to_delete = list(set(objects_to_delete))  # Need to reverse sort so we delete from end to start so indexes don't change.
     objects_to_delete.sort(reverse=True)  # Make unique.
     for index in objects_to_delete:
