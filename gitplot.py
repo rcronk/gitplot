@@ -1,3 +1,5 @@
+import time
+
 import graphviz
 
 import git
@@ -30,7 +32,8 @@ gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-repo = git.Repo(r'C:\Users\24860\code\git\devtools')
+#repo = git.Repo(r'C:\Users\24860\code\git\devtools')
+repo = git.Repo(r'C:\Users\24860\code\git\common')
 # repo = git.Repo()
 
 if {'tree', 'blob'} & set(types_to_include):
@@ -43,7 +46,11 @@ if collapse_commits:
     # interesting parts of the branching structure.
     refs = repo.get_refs()
     secondary_parents = []
+    processed = 0
+    total = len(refs)
     for ref in refs:
+        print('%s - Finding branch/merge points: %s (%d of %d)' % (time.ctime(), ref.ref_name, processed, total))
+        processed += 1
         if ref.ref_name != 'HEAD':
             commit_list = [x.commit_id for x in objects]
             obj_index = commit_list.index(ref.commit_id)
@@ -56,7 +63,11 @@ if collapse_commits:
                 obj = obj.parents[0].git_object
 
     objects_to_delete = []
+    processed = 0
+    total = len(refs + secondary_parents)
     for ref in refs + secondary_parents:
+        print('%s - Collapsing boring commits: %s (%d of %d)' % (time.ctime(), ref.ref_name, processed, total))
+        processed += 1
         if ref.ref_name != 'HEAD':
             obj_index = [x.commit_id for x in objects].index(ref.commit_id)
             obj = objects[obj_index]
@@ -100,10 +111,18 @@ if collapse_commits:
                 objects.append(git.CommitSummary(first_commit_id, last_obj.commit_id, commits, last_obj.parents))
     objects_to_delete = list(set(objects_to_delete))  # Need to reverse sort so we delete from end to start so indexes don't change.
     objects_to_delete.sort(reverse=True)  # Make unique.
+    processed = 0
+    total = len(objects_to_delete)
     for index in objects_to_delete:
+        print('%s - Removing boring commits: %s (%d of %d)' % (time.ctime(), objects[index].commit_id, processed, total))
+        processed += 1
         del objects[index]
 
+processed = 0
+total = len(objects)
 for git_obj in objects:
+    print('%s - Building graph: %d of %d' % (time.ctime(), processed, total))
+    processed += 1
     if git_obj.object_type in types_to_include:
         if git_obj.object_type == 'commitsummary':
             label = '%s (%s) %s' % (git_obj.last_commit_id[:4], git_obj.commits, git_obj.commit_id[:4])
@@ -126,7 +145,11 @@ for git_obj in objects:
 if 'ref' in types_to_include:
     refs = repo.get_refs()
 
+    processed = 0
+    total = len(refs)
     for ref in refs:
+        print('%s - Processing refs: %d of %d' % (time.ctime(), processed, total))
+        processed += 1
         gv.node(ref.ref_name, color=type_colors['ref'].line_color,
                 style='filled',
                 fillcolor=type_colors['ref'].fill_color,
