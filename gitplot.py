@@ -1,4 +1,5 @@
 import time
+import math
 
 import graphviz
 
@@ -31,15 +32,19 @@ collapse_commits = True  # This isn't working yet.
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
-# repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-#repo = git.Repo(r'C:\Users\24860\code\git\devtools')
-repo = git.Repo(r'C:\Users\24860\code\git\common')
+repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+# repo = git.Repo(r'C:\Users\24860\code\git\devtools')
+# repo = git.Repo(r'C:\Users\24860\code\git\common')
 # repo = git.Repo()
 
 if {'tree', 'blob'} & set(types_to_include):
     objects = repo.get_objects()
 else:
     objects = repo.get_commits()
+
+# Calculate the length of the short hash based on the total number of objects
+num_objects = len(objects)
+hash_length = int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2))
 
 if collapse_commits:
     # Trace back from each ref back to the first commit, deleting commits with single parents, etc. to just show
@@ -125,9 +130,9 @@ for git_obj in objects:
     processed += 1
     if git_obj.object_type in types_to_include:
         if git_obj.object_type == 'commitsummary':
-            label = '%s (%s) %s' % (git_obj.last_commit_id[:4], git_obj.commits, git_obj.commit_id[:4])
+            label = '%s (%s) %s' % (git_obj.last_commit_id[:hash_length], git_obj.commits, git_obj.commit_id[:hash_length])
         else:
-            label = git_obj.commit_id[:4]
+            label = git_obj.commit_id[:hash_length]
         gv.node(git_obj.commit_id,
                 label=label,
                 color=type_colors[git_obj.object_type].line_color,
