@@ -22,17 +22,18 @@ for object_type in object_types:
     type_colors[object_type] = Colors(line, fill)
     hue += hue_step
 
-# types_to_include = ('blob', 'tree', 'commit', 'ref', 'tag')
+types_to_include = ('blob', 'tree', 'commit', 'ref', 'tag')
 # types_to_include = ('tree', 'commit', 'ref', 'tag')
-types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
+# types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('blob', 'tree')
 
-collapse_commits = True  # This isn't working yet.
+collapse_commits = False
 
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
-repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+# repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo(r'C:\Users\24860\code\git\common')
 # repo = git.Repo()
