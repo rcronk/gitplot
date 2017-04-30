@@ -22,12 +22,12 @@ for object_type in object_types:
     type_colors[object_type] = Colors(line, fill)
     hue += hue_step
 
-types_to_include = ('blob', 'tree', 'commit', 'ref', 'tag')
+types_to_include = ('blob', 'tree', 'commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('tree', 'commit', 'ref', 'tag')
 # types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('blob', 'tree')
 
-collapse_commits = False
+collapse_commits = True
 
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
