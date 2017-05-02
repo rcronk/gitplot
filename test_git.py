@@ -2,7 +2,7 @@ import unittest
 import subprocess
 import logging
 
-import git
+import old_git
 
 
 class TestGit(unittest.TestCase):
@@ -19,14 +19,14 @@ class TestGit(unittest.TestCase):
 #                                   ):
 #            self.assertEqual(type(git.NewGitObject.create(commit_id)), obj_type)
 
-        commit = git.GitObject.create('18e8')
+        commit = old_git.GitObject.create('18e8')
         self.assertEqual(commit.object_type, 'commit')
         self.assertEqual(len(commit.parents), 1)
         self.assertEqual(commit.parents[0].commit_id, '948549522ae6dd63c318d0d13532be8e1ffa5a4b')
         self.assertEqual(len(commit.children), 1)
         self.assertEqual(commit.children[0].commit_id, '88492f905c97437264642429d353cc34daf66112')
 
-        objects = git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k').get_objects()
+        objects = old_git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-jjymki0k').get_objects()
         print(objects)
         self.assertEqual(len(objects), 7)
         self.assertEqual(objects[0].object_type, 'commit')
@@ -43,7 +43,7 @@ class TestGit(unittest.TestCase):
 
 
     def test_pylint(self):
-        self.assertEqual(0, subprocess.call(['pylint', 'git.py']))
+        self.assertEqual(0, subprocess.call(['pylint', 'old_git.py']))
 
 
 if __name__ == '__main__':

@@ -68,9 +68,12 @@ class Repo(object):
         for sha in git_commits:
             objects.append(Commit(sha))
 
-        all_tags = self.git_cmd(['git', 'show-ref', '--tags'])
-        git_tags = re.findall('^(?P<sha1>[A-Fa-f0-9]{40}).*$',
-                                 all_tags, re.MULTILINE)  #pylint: disable=no-member
+        try:
+            all_tags = self.git_cmd(['git', 'show-ref', '--tags'])
+            git_tags = re.findall('^(?P<sha1>[A-Fa-f0-9]{40}).*$',
+                                  all_tags, re.MULTILINE)  #pylint: disable=no-member
+        except Exception:
+            git_tags = []
         for sha in git_tags:
             objects.append(GitObject.create(sha))
 
