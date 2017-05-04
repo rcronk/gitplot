@@ -65,7 +65,7 @@ def add_head(head):
 
 def add_sym_ref(name, parent):
     gv.node(name,
-            label=parent,
+            label=name,
             color=type_colors['ref'].line_color,
             style='filled',
             fillcolor=type_colors['ref'].fill_color,
@@ -76,9 +76,9 @@ def add_sym_ref(name, parent):
 edges = {}
 def add_edge(git_obj, parent):
     if type(git_obj) in (git.Head, git.TagReference, git.RemoteReference):
-        if git_obj.name + parent.hexsha not in edges:
-            edges[git_obj.name + parent.hexsha] = None
-            gv.edge(git_obj.name, parent.hexsha, label=str(type(git_obj)))
+        if git_obj.path + parent.hexsha not in edges:
+            edges[git_obj.path + parent.hexsha] = None
+            gv.edge(git_obj.path, parent.hexsha, label=str(type(git_obj)))
     elif type(git_obj) in (git.Commit, git.TagObject):
         if git_obj.hexsha + parent.hexsha not in edges:
             edges[git_obj.hexsha + parent.hexsha] = None
