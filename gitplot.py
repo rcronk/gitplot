@@ -111,7 +111,13 @@ for git_obj in refs:
     else:
         raise Exception('unknown type: %s' % type(git_obj))
     while obj.parents:
-        # handle collapsing here
+        # Are we collapsing?
+        #     if this is another boring commit (i.e. no refs pointing to it, one parent, one child), make the summary last sha = this sha, increment commits collapsed, and move on
+        #     else if commits collapsed > 1, insert this summary, set collapsing to false
+        #          else insert the stored commit since there was only one - as usual vvvv
+        # else:
+        #     if this is a boring commit store it in case there is only one boring commit in this chain, set commits collapsed to 1
+        #     else process this object as usual vvvv
         if obj.hexsha not in [x.hexsha for x in objects]:
             add_commit(obj)
             add_edge(obj, obj.parents[0])
