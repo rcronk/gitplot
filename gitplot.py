@@ -32,10 +32,10 @@ gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+# repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 # repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
-# repo = git.Repo(r'C:\Users\24860\code\git\common')
+repo = git.Repo(r'C:\Users\24860\code\git\common')
 # repo = git.Repo('.')
 
 # Calculate the length of the short hash based on the total number of objects
@@ -75,7 +75,7 @@ def add_sym_ref(name, parent):
 
 edges = {}
 def add_edge(git_obj, parent):
-    if type(git_obj) in (git.Head, git.TagReference):
+    if type(git_obj) in (git.Head, git.TagReference, git.RemoteReference):
         if git_obj.name + parent.hexsha not in edges:
             edges[git_obj.name + parent.hexsha] = None
             gv.edge(git_obj.name, parent.hexsha, label=str(type(git_obj)))
@@ -99,7 +99,7 @@ for git_obj in refs:
     elif type(git_obj) == git.Commit:
         add_commit(git_obj)
         obj = git_obj
-    elif type(git_obj) == git.TagReference:
+    elif type(git_obj) in (git.TagReference, git.RemoteReference):
         add_head(git_obj)
         add_edge(git_obj, git_obj.object)
         # If this is an annotated tag, commit and object don't match?
