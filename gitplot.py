@@ -35,8 +35,8 @@ gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit o
 # repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 # repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
-repo = git.Repo(r'C:\Users\24860\code\git\common')
-# repo = git.Repo('.')
+# repo = git.Repo(r'C:\Users\24860\code\git\common')
+repo = git.Repo('.')
 
 # Calculate the length of the short hash based on the total number of objects
 num_objects = 100 # len(objects)
