@@ -26,17 +26,17 @@ for object_type in object_types:
 types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('blob', 'tree')
 
-collapse_commits = False
+#collapse_commits = False
 
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 # repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-# repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
+repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo(r'C:\Users\24860\code\git\common')
-repo = git.Repo('.')
+# repo = git.Repo('.')
 
 # Calculate the length of the short hash based on the total number of objects
 num_objects = 100 # len(objects)
@@ -54,9 +54,9 @@ def add_commit(commit):
 
 
 def add_collapsed_commits(first_hexsha, last_hexsha, commits):
-    label = '%s (%d) %s' % (first_hexsha[:hash_length],
+    label = '%s (%d) %s' % (last_hexsha[:hash_length],
                             commits,
-                            last_hexsha[:hash_length])
+                            first_hexsha[:hash_length])
     gv.node(first_hexsha,
             label=label,
             color=type_colors['commitsummary'].line_color,
@@ -105,7 +105,7 @@ def add_edge(git_obj, parent):
 def boring(commit, refs):
     parents = len(commit.parents)
     children = 1
-    num_refs = len([x for x in refs if x.object.hexsha == commit.hexsha])
+    num_refs = len([x for x in refs if type(x) == git.Head and x.object.hexsha == commit.hexsha])
     return parents == 1 and children == 1 and num_refs == 0
 
 
@@ -144,7 +144,15 @@ for git_obj in refs:
                 else:
                     add_collapsed_commits(first_collapsed_commit.hexsha,
                                           last_collapsed_commit.hexsha,
-                                          collapse_commits)
+                                          collapsed_commits)
+                    add_edge(first_collapsed_commit, obj)
+                    # Now add this non-boring commit
+                    add_commit(obj)
+                    add_edge(obj, obj.parents[0])
+                    for parent in obj.parents[1:]:
+                        if parent.hexsha not in [x.hexsha for x in objects]:
+                            add_edge(obj, parent)
+                            refs.append(parent)  # Follow these other paths later
                 collapsing = False
                 collapsed_commits = 0
         else:
@@ -161,6 +169,11 @@ for git_obj in refs:
                             add_edge(obj, parent)
                             refs.append(parent)  # Follow these other paths later
         obj = obj.parents[0]
+    if collapsing:
+        add_collapsed_commits(first_collapsed_commit.hexsha,
+                              last_collapsed_commit.hexsha,
+                              collapsed_commits)
+        add_edge(first_collapsed_commit, obj)
     add_commit(obj)
 
 add_sym_ref('HEAD', repo.head.ref.path)
