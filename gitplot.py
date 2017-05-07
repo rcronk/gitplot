@@ -33,12 +33,13 @@ gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit o
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 # repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
+# repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo(r'C:\Users\24860\code\git\common')
 # repo = git.Repo(r'C:\Users\24860\Documents\hti')
 # repo = git.Repo(r'C:\ftl')
-# repo = git.Repo('.')
+repo = git.Repo('.')
+
 
 def add_commit(commit):
     gv.node(commit.hexsha,
@@ -48,6 +49,32 @@ def add_commit(commit):
             fillcolor=type_colors[commit.type].fill_color,
             penwidth='2',
             )
+    if commit.type == 'commit':
+        add_tree(commit)
+
+
+def add_tree(commit):
+    gv.node(commit.tree.hexsha,
+            label=commit.tree.hexsha[:hash_length],
+            color=type_colors[commit.tree.type].line_color,
+            style='filled',
+            fillcolor=type_colors[commit.tree.type].fill_color,
+            penwidth='2',
+            )
+    add_edge(commit, commit.tree)
+    for blob in commit.tree.blobs:
+        add_blob(commit.tree, blob)
+
+
+def add_blob(tree, blob):
+    gv.node(blob.hexsha,
+            label=blob.hexsha[:hash_length],
+            color=type_colors[blob.type].line_color,
+            style='filled',
+            fillcolor=type_colors[blob.type].fill_color,
+            penwidth='2',
+            )
+    add_edge(tree, blob)
 
 
 def add_collapsed_commits(first_hexsha, last_hexsha, commits):
@@ -89,10 +116,18 @@ def add_edge(git_obj, parent):
         if git_obj.path + parent.hexsha not in edges:
             edges[git_obj.path + parent.hexsha] = None
             gv.edge(git_obj.path, parent.hexsha, label=str(type(git_obj)))
-    elif type(git_obj) in (git.Commit, git.TagObject):
+    elif type(git_obj) in (git.Commit, git.TagObject) and type(parent) in (git.Commit, git.TagObject):
         if git_obj.hexsha + parent.hexsha not in edges:
             edges[git_obj.hexsha + parent.hexsha] = None
             gv.edge(git_obj.hexsha, parent.hexsha, label='parent')
+    elif type(git_obj) in (git.Commit, git.TagObject) and type(parent) in (git.Tree, ):
+        if git_obj.hexsha + parent.hexsha not in edges:
+            edges[git_obj.hexsha + parent.hexsha] = None
+            gv.edge(git_obj.hexsha, parent.hexsha, label='tree')
+    elif type(git_obj) in (git.Tree, ):
+        if git_obj.hexsha + parent.hexsha not in edges:
+            edges[git_obj.hexsha + parent.hexsha] = None
+            gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
     elif type(git_obj) == str:
         gv.edge(git_obj, parent, label='ref')
     else:
