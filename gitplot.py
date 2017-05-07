@@ -32,16 +32,11 @@ gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-# repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
+repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+# repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo(r'C:\Users\24860\code\git\common')
 # repo = git.Repo('.')
-
-# Calculate the length of the short hash based on the total number of objects
-num_objects = 100 # len(objects)
-hash_length = int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2))
-
 
 def add_commit(commit):
     gv.node(commit.hexsha,
@@ -102,15 +97,51 @@ def add_edge(git_obj, parent):
         raise Exception('unknown type: %s' % type(git_obj))
 
 
-def boring(commit, refs):
+all_children = {}
+
+def boring(commit):
     parents = len(commit.parents)
-    children = 1
-    num_refs = len([x for x in refs if type(x) == git.Head and x.object.hexsha == commit.hexsha])
+    if commit in all_children:
+        children = len(all_children[commit])
+    else:
+        children = 0
+    num_refs = len([x for x in commit.repo.refs if type(x) in (git.Head, git.RemoteReference) and x.object.hexsha == commit.hexsha])
     return parents == 1 and children == 1 and num_refs == 0
 
-
+# Pre-scan for children, branch points
 refs = repo.refs
-objects = []
+for git_obj in refs:
+    if type(git_obj) == git.Head:
+        obj = git_obj.object
+    elif type(git_obj) == git.Commit:
+        obj = git_obj
+    elif type(git_obj) in (git.TagReference, git.RemoteReference):
+        obj = git_obj.commit
+    else:
+        raise Exception('unknown type: %s' % type(git_obj))
+    while obj.parents:
+        for parent in obj.parents[1:]:
+            if parent.hexsha not in [x.hexsha for x in refs if type(x) == git.Commit]:
+                refs.append(parent)  # Follow these other paths later
+                if parent in all_children:
+                    if obj not in all_children[parent]:
+                        all_children[parent] += [obj]
+                else:
+                    all_children[parent] = [obj]
+        if obj.parents[0] in all_children:
+            if obj not in all_children[obj.parents[0]]:
+                all_children[obj.parents[0]] += [obj]
+        else:
+            all_children[obj.parents[0]] = [obj]
+        obj = obj.parents[0]
+
+
+# Calculate the length of the short hash based on the total number of objects
+num_objects = len(all_children)
+hash_length = int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2))
+
+
+# Final pass, build the graph
 for git_obj in refs:
     if type(git_obj) == git.Head:
         add_head(git_obj)
@@ -133,48 +164,43 @@ for git_obj in refs:
 
     collapsing = False
     collapsed_commits = 0
-    while obj.parents:
+    while obj:
         if collapsing:
-            if boring(obj, refs):
+            if boring(obj):
                 last_collapsed_commit = obj
                 collapsed_commits += 1
             else:
                 if collapsed_commits == 1:
                     add_commit(first_collapsed_commit)
+                    add_edge(first_collapsed_commit, obj)
                 else:
                     add_collapsed_commits(first_collapsed_commit.hexsha,
                                           last_collapsed_commit.hexsha,
                                           collapsed_commits)
                     add_edge(first_collapsed_commit, obj)
                     # Now add this non-boring commit
-                    add_commit(obj)
+                add_commit(obj)
+                if obj.parents:
                     add_edge(obj, obj.parents[0])
                     for parent in obj.parents[1:]:
-                        if parent.hexsha not in [x.hexsha for x in objects]:
                             add_edge(obj, parent)
-                            refs.append(parent)  # Follow these other paths later
                 collapsing = False
                 collapsed_commits = 0
         else:
-            if boring(obj, refs):
+            if boring(obj):
                 collapsing = True
                 first_collapsed_commit = obj
                 collapsed_commits = 1
             else:
-                if obj.hexsha not in [x.hexsha for x in objects]:
-                    add_commit(obj)
+                add_commit(obj)
+                if obj.parents:
                     add_edge(obj, obj.parents[0])
                     for parent in obj.parents[1:]:
-                        if parent.hexsha not in [x.hexsha for x in objects]:
-                            add_edge(obj, parent)
-                            refs.append(parent)  # Follow these other paths later
-        obj = obj.parents[0]
-    if collapsing:
-        add_collapsed_commits(first_collapsed_commit.hexsha,
-                              last_collapsed_commit.hexsha,
-                              collapsed_commits)
-        add_edge(first_collapsed_commit, obj)
-    add_commit(obj)
+                        add_edge(obj, parent)
+        if obj.parents:
+            obj = obj.parents[0]
+        else:
+            obj = None
 
 add_sym_ref('HEAD', repo.head.ref.path)
 add_edge('HEAD', repo.head.ref.path)
