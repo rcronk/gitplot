@@ -32,13 +32,14 @@ gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-# repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 # repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
+# repo = git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-7vtu1dwq')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo(r'C:\Users\24860\code\git\common')
 # repo = git.Repo(r'C:\Users\24860\Documents\hti')
 # repo = git.Repo(r'C:\ftl')
-repo = git.Repo('.')
+# repo = git.Repo('.')
 
 
 def add_commit(commit):
@@ -50,20 +51,22 @@ def add_commit(commit):
             penwidth='2',
             )
     if commit.type == 'commit':
-        add_tree(commit)
+        add_tree(commit, commit.tree)
 
 
-def add_tree(commit):
-    gv.node(commit.tree.hexsha,
-            label=commit.tree.hexsha[:hash_length],
-            color=type_colors[commit.tree.type].line_color,
+def add_tree(parent, tree):
+    gv.node(tree.hexsha,
+            label=tree.hexsha[:hash_length],
+            color=type_colors[tree.type].line_color,
             style='filled',
-            fillcolor=type_colors[commit.tree.type].fill_color,
+            fillcolor=type_colors[tree.type].fill_color,
             penwidth='2',
             )
-    add_edge(commit, commit.tree)
-    for blob in commit.tree.blobs:
-        add_blob(commit.tree, blob)
+    add_edge(parent, tree)
+    for blob in tree.blobs:
+        add_blob(tree, blob)
+    for child_tree in tree.trees:
+        add_tree(tree, child_tree)
 
 
 def add_blob(tree, blob):
@@ -178,7 +181,7 @@ for git_obj in refs:
 
 # Calculate the length of the short hash based on the total number of objects
 num_objects = len(all_children)
-hash_length = int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2))
+hash_length = max(1, int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2)))
 
 print ('Pre-scan finished.')
 print ('%d objects found.' % num_objects)
