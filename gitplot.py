@@ -32,10 +32,12 @@ gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+# repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 # repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo(r'C:\Users\24860\code\git\common')
+# repo = git.Repo(r'C:\Users\24860\Documents\hti')
+repo = git.Repo(r'C:\ftl')
 # repo = git.Repo('.')
 
 def add_commit(commit):
