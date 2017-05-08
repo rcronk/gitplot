@@ -1,4 +1,3 @@
-import time
 import math
 
 import graphviz
@@ -21,26 +20,26 @@ for object_type in object_types:
     type_colors[object_type] = Colors(line, fill)
     hue += hue_step
 
-# types_to_include = ('blob', 'tree', 'commit', 'commitsummary', 'ref', 'tag')
-# types_to_include = ('tree', 'commit', 'ref', 'tag')
 types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
-# types_to_include = ('blob', 'tree')
+# types_to_include = ('tree', 'commit', 'commitsummary', 'ref', 'tag')
+# types_to_include = ('blob', 'tree', 'commit', 'commitsummary', 'ref', 'tag')
 
-#collapse_commits = False
+collapse_commits = True
+branch_diagram = False
+include_remotes = True
 
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
 # repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-# repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
+# repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
 # repo = git.Repo(r'C:\Users\cronk\AppData\Local\Temp\temprepo-7vtu1dwq')
 # repo = git.Repo(r'C:\Users\24860\code\git\devtools')
 # repo = git.Repo(r'C:\Users\24860\code\git\common')
 # repo = git.Repo(r'C:\Users\24860\Documents\hti')
 # repo = git.Repo(r'C:\ftl')
 # repo = git.Repo('.')
-
 
 def add_commit(commit):
     gv.node(commit.hexsha,
@@ -50,7 +49,7 @@ def add_commit(commit):
             fillcolor=type_colors[commit.type].fill_color,
             penwidth='2',
             )
-    if commit.type == 'commit':
+    if commit.type == 'commit' and 'tree' in types_to_include:
         add_tree(commit, commit.tree)
 
 
@@ -63,8 +62,9 @@ def add_tree(parent, tree):
             penwidth='2',
             )
     add_edge(parent, tree)
-    for blob in tree.blobs:
-        add_blob(tree, blob)
+    if 'blob' in types_to_include:
+        for blob in tree.blobs:
+            add_blob(tree, blob)
     for child_tree in tree.trees:
         add_tree(tree, child_tree)
 
@@ -118,7 +118,9 @@ def add_edge(git_obj, parent):
     if type(git_obj) in (git.Head, git.TagReference, git.RemoteReference):
         if git_obj.path + parent.hexsha not in edges:
             edges[git_obj.path + parent.hexsha] = None
-            gv.edge(git_obj.path, parent.hexsha, label=str(type(git_obj)))
+            label = str(type(git_obj))
+            label = label.split('.')[-1][:-2]
+            gv.edge(git_obj.path, parent.hexsha, label=label)
     elif type(git_obj) in (git.Commit, git.TagObject) and type(parent) in (git.Commit, git.TagObject):
         if git_obj.hexsha + parent.hexsha not in edges:
             edges[git_obj.hexsha + parent.hexsha] = None
@@ -132,7 +134,7 @@ def add_edge(git_obj, parent):
             edges[git_obj.hexsha + parent.hexsha] = None
             gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
     elif type(git_obj) == str:
-        gv.edge(git_obj, parent, label='ref')
+        gv.edge(git_obj, parent, label='Head')
     else:
         raise Exception('unknown type: %s' % type(git_obj))
 
@@ -140,16 +142,23 @@ def add_edge(git_obj, parent):
 all_children = {}
 
 def boring(commit):
+    branch_point = commit.hexsha not in [x for x in all_children if len(all_children[x]) > 1]
     parents = len(commit.parents)
     if commit in all_children:
         children = len(all_children[commit])
     else:
         children = 0
     num_refs = len([x for x in commit.repo.refs if type(x) in (git.Head, git.RemoteReference) and x.object.hexsha == commit.hexsha])
-    return parents == 1 and children == 1 and num_refs == 0
+    if branch_diagram:
+        return parents == 1 or not branch_point
+    else:
+        return parents == 1 and children == 1 and num_refs == 0
 
 print ('Pre-scanning the tree...')
-refs = repo.refs
+if include_remotes:
+    refs = repo.refs
+else:
+    refs = [x for x in repo.refs if 'remote' not in x.path]
 for git_obj in refs:
     if type(git_obj) == git.Head:
         print('Scanning head %s...' % git_obj.path)
@@ -187,82 +196,70 @@ print ('Pre-scan finished.')
 print ('%d objects found.' % num_objects)
 print ('calculated short hash length: %d' % hash_length)
 
-branch_diagram = False
-
 # Final pass, build the graph
-if branch_diagram:
-    # Not done yet...
-    print('Creating branch diagram...')
-    for obj in all_children:
-        if len(all_children[obj]) > 1:
-            add_commit(obj)
-            for child in all_children[obj]:
-                add_commit(child)
-                add_edge(obj, child)
-else:
-    print('Creating tree diagram...')
-    for git_obj in refs:
-        if type(git_obj) == git.Head:
-            add_head(git_obj)
-            add_edge(git_obj, git_obj.object)
-            obj = git_obj.object
-        elif type(git_obj) == git.Commit:
-            add_commit(git_obj)
-            obj = git_obj
-        elif type(git_obj) in (git.TagReference, git.RemoteReference):
-            add_head(git_obj)
-            add_edge(git_obj, git_obj.object)
-            # If this is an annotated tag, commit and object don't match
-            if git_obj.object != git_obj.commit:
-                add_commit(git_obj.object)
-                add_commit(git_obj.commit)
-                add_edge(git_obj.object, git_obj.commit)
-            obj = git_obj.commit
-        else:
-            raise Exception('unknown type: %s' % type(git_obj))
+print('Creating tree diagram...')
+for git_obj in refs:
+    if type(git_obj) == git.Head:
+        add_head(git_obj)
+        add_edge(git_obj, git_obj.object)
+        obj = git_obj.object
+    elif type(git_obj) == git.Commit:
+        add_commit(git_obj)
+        obj = git_obj
+    elif type(git_obj) in (git.TagReference, git.RemoteReference):
+        add_head(git_obj)
+        add_edge(git_obj, git_obj.object)
+        # If this is an annotated tag, commit and object don't match
+        if git_obj.object != git_obj.commit:
+            add_commit(git_obj.object)
+            add_commit(git_obj.commit)
+            add_edge(git_obj.object, git_obj.commit)
+        obj = git_obj.commit
+    else:
+        raise Exception('unknown type: %s' % type(git_obj))
 
-        collapsing = False
-        collapsed_commits = 0
-        while obj:
-            if collapsing:
-                if boring(obj):
-                    last_collapsed_commit = obj
-                    collapsed_commits += 1
-                else:
-                    if collapsed_commits == 1:
-                        add_commit(first_collapsed_commit)
-                        add_edge(first_collapsed_commit, obj)
-                    else:
-                        add_collapsed_commits(first_collapsed_commit.hexsha,
-                                              last_collapsed_commit.hexsha,
-                                              collapsed_commits)
-                        add_edge(first_collapsed_commit, obj)
-                        # Now add this non-boring commit
-                    add_commit(obj)
-                    if obj.parents:
-                        add_edge(obj, obj.parents[0])
-                        for parent in obj.parents[1:]:
-                                add_edge(obj, parent)
-                    collapsing = False
-                    collapsed_commits = 0
+    collapsing = False
+    collapsed_commits = 0
+    while obj:
+        if collapse_commits and collapsing:
+            if boring(obj):
+                last_collapsed_commit = obj
+                collapsed_commits += 1
             else:
-                if boring(obj):
-                    collapsing = True
-                    first_collapsed_commit = obj
-                    collapsed_commits = 1
+                if collapsed_commits == 1:
+                    add_commit(first_collapsed_commit)
+                    add_edge(first_collapsed_commit, obj)
                 else:
-                    add_commit(obj)
-                    if obj.parents:
-                        add_edge(obj, obj.parents[0])
-                        for parent in obj.parents[1:]:
+                    add_collapsed_commits(first_collapsed_commit.hexsha,
+                                          last_collapsed_commit.hexsha,
+                                          collapsed_commits)
+                    add_edge(first_collapsed_commit, obj)
+                    # Now add this non-boring commit
+                add_commit(obj)
+                if obj.parents:
+                    add_edge(obj, obj.parents[0])
+                    for parent in obj.parents[1:]:
                             add_edge(obj, parent)
-            if obj.parents:
-                obj = obj.parents[0]
+                collapsing = False
+                collapsed_commits = 0
+        else:
+            if collapse_commits and boring(obj):
+                collapsing = True
+                first_collapsed_commit = obj
+                collapsed_commits = 1
             else:
-                obj = None
+                add_commit(obj)
+                if obj.parents:
+                    add_edge(obj, obj.parents[0])
+                    for parent in obj.parents[1:]:
+                        add_edge(obj, parent)
+        if obj.parents:
+            obj = obj.parents[0]
+        else:
+            obj = None
 
-    add_sym_ref('HEAD', repo.head.ref.path)
-    add_edge('HEAD', repo.head.ref.path)
+add_sym_ref('HEAD', repo.head.ref.path)
+add_edge('HEAD', repo.head.ref.path)
 
 print('Rendering graph...')
 gv.render('git')
