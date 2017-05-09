@@ -280,16 +280,16 @@ logging.info('Done.')
 
 def main(arguments):
     """ Entry point for command line. """
-    print('gitplot %s' % __version__)
+    logging.info('gitplot %s', __version__)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('repo', help='Path to the git repo.', default='.')
-    parser.add_argument('--object-types', help='Which object types to display.', nargs='+', type='string', default=['commit', 'ref', 'tag'])
+    parser.add_argument('--repo-path', help='Path to the git repo.', default='.')
+    parser.add_argument('--object-types', help='Which object types to display.', nargs='+', type=str, default=['commit', 'ref', 'tag'])
     parser.add_argument('--collapse-commits', action="store_true", default=True)
     parser.add_argument('--include-remotes', action="store_true", default=False)
     args = parser.parse_args(arguments)
 
-    print('args: %s' % args)
+    logging.info('args: %s', args)
     # TODO: Convert above code to be object oriented, then make calls here to use it all.
 
 if __name__ == "__main__":
