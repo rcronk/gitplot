@@ -1,8 +1,13 @@
+""" GitPlot - The git plotter. """
+import sys
 import math
 import logging
+import argparse
 
 import graphviz
 import git
+
+__version__ = '0.0.5'
 
 
 class Colors(object):
@@ -41,6 +46,7 @@ gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit o
 # repo = git.Repo(r'C:\ftl')
 repo = git.Repo('.')
 
+
 def add_commit(commit):
     gv.node(commit.hexsha,
             label=commit.hexsha[:hash_length],
@@ -48,7 +54,7 @@ def add_commit(commit):
             style='filled',
             fillcolor=type_colors[commit.type].fill_color,
             penwidth='2',
-            )
+           )
     if commit.type == 'commit' and 'tree' in types_to_include:
         add_tree(commit, commit.tree)
 
@@ -60,7 +66,7 @@ def add_tree(parent, tree):
             style='filled',
             fillcolor=type_colors[tree.type].fill_color,
             penwidth='2',
-            )
+           )
     add_edge(parent, tree)
     if 'blob' in types_to_include:
         for blob in tree.blobs:
@@ -76,7 +82,7 @@ def add_blob(tree, blob):
             style='filled',
             fillcolor=type_colors[blob.type].fill_color,
             penwidth='2',
-            )
+           )
     add_edge(tree, blob)
 
 
@@ -90,7 +96,7 @@ def add_collapsed_commits(first_hexsha, last_hexsha, commits):
             style='filled',
             fillcolor=type_colors['commitsummary'].fill_color,
             penwidth='2',
-            )
+           )
 
 
 def add_head(head):
@@ -100,7 +106,7 @@ def add_head(head):
             style='filled',
             fillcolor=type_colors['ref'].fill_color,
             penwidth='2',
-            )
+           )
 
 
 def add_sym_ref(name, parent):
@@ -110,7 +116,7 @@ def add_sym_ref(name, parent):
             style='filled',
             fillcolor=type_colors['ref'].fill_color,
             penwidth='2',
-            )
+           )
 
 
 edges = {}
@@ -245,7 +251,7 @@ for git_obj in refs:
                 if obj.parents:
                     add_edge(obj, obj.parents[0])
                     for parent in obj.parents[1:]:
-                            add_edge(obj, parent)
+                        add_edge(obj, parent)
                 collapsing = False
                 collapsed_commits = 0
         else:
@@ -270,3 +276,21 @@ add_edge('HEAD', repo.head.ref.path)
 logging.info('Rendering graph...')
 gv.render('git')
 logging.info('Done.')
+
+
+def main(arguments):
+    """ Entry point for command line. """
+    print('gitplot %s' % __version__)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('repo', help='Path to the git repo.', default='.')
+    parser.add_argument('--object-types', help='Which object types to display.', nargs='+', type='string', default=['commit', 'ref', 'tag'])
+    parser.add_argument('--collapse-commits', action="store_true", default=True)
+    parser.add_argument('--include-remotes', action="store_true", default=False)
+    args = parser.parse_args(arguments)
+
+    print('args: %s' % args)
+    # TODO: Convert above code to be object oriented, then make calls here to use it all.
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
