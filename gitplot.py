@@ -1,4 +1,5 @@
 import math
+import logging
 
 import graphviz
 import git
@@ -140,6 +141,7 @@ def add_edge(git_obj, parent):
 
 all_children = {}
 
+
 def boring(commit):
     branch_point = commit.hexsha not in [x for x in all_children if len(all_children[x]) > 1]
     parents = len(commit.parents)
@@ -148,25 +150,27 @@ def boring(commit):
     else:
         children = 0
     num_refs = len([x for x in commit.repo.refs if type(x) in (git.Head, git.RemoteReference) and x.object.hexsha == commit.hexsha])
-    if branch_diagram:
+    if branch_diagram:  # This doesn't work yet.
         return parents == 1 or not branch_point
     else:
         return parents == 1 and children == 1 and num_refs == 0
 
-print ('Pre-scanning the tree...')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+
+logging.info('Pre-scanning the tree...')
 if include_remotes:
     refs = repo.refs
 else:
     refs = [x for x in repo.refs if 'remote' not in x.path]
 for git_obj in refs:
     if type(git_obj) == git.Head:
-        print('Scanning head %s...' % git_obj.path)
+        logging.info('Scanning head %s...', git_obj.path)
         obj = git_obj.object
     elif type(git_obj) == git.Commit:
-        print('Scanning detected merge path from %s...' % git_obj.hexsha)
+        logging.info('Scanning detected merge path from %s...', git_obj.hexsha)
         obj = git_obj
     elif type(git_obj) in (git.TagReference, git.RemoteReference):
-        print('Scanning reference %s...' % git_obj.path)
+        logging.info('Scanning reference %s...', git_obj.path)
         obj = git_obj.commit
     else:
         raise Exception('unknown type: %s' % type(git_obj))
@@ -191,21 +195,24 @@ for git_obj in refs:
 num_objects = len(all_children)
 hash_length = max(1, int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2)))
 
-print ('Pre-scan finished.')
-print ('%d objects found.' % num_objects)
-print ('calculated short hash length: %d' % hash_length)
+logging.info('Pre-scan finished.')
+logging.info('%d objects found.', num_objects)
+logging.info('calculated short hash length: %d', hash_length)
 
 # Final pass, build the graph
-print('Creating tree diagram...')
+logging.info('Creating tree diagram...')
 for git_obj in refs:
     if type(git_obj) == git.Head:
+        logging.info('Processing head %s...', git_obj.path)
         add_head(git_obj)
         add_edge(git_obj, git_obj.object)
         obj = git_obj.object
     elif type(git_obj) == git.Commit:
+        logging.info('Processing detected merge path from %s...', git_obj.hexsha)
         add_commit(git_obj)
         obj = git_obj
     elif type(git_obj) in (git.TagReference, git.RemoteReference):
+        logging.info('Processing reference %s...', git_obj.path)
         add_head(git_obj)
         add_edge(git_obj, git_obj.object)
         # If this is an annotated tag, commit and object don't match
@@ -260,6 +267,6 @@ for git_obj in refs:
 add_sym_ref('HEAD', repo.head.ref.path)
 add_edge('HEAD', repo.head.ref.path)
 
-print('Rendering graph...')
+logging.info('Rendering graph...')
 gv.render('git')
-print('Done.')
+logging.info('Done.')
