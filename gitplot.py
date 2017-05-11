@@ -17,7 +17,7 @@ class Colors(object):
 
 
 type_colors = {}
-object_types = ['ref', 'tag', 'commit', 'commitsummary', 'tree', 'blob']
+object_types = ['ref', 'tag', 'commit', 'commitsummary', 'commitdetails', 'tree', 'blob']
 hue_step = 1.0 / len(object_types)
 hue = 0.000
 for object_type in object_types:
@@ -26,7 +26,8 @@ for object_type in object_types:
     type_colors[object_type] = Colors(line, fill)
     hue += hue_step
 
-types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
+types_to_include = ('commit', 'commitsummary', 'commitdetails', 'ref', 'tag')
+# types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('tree', 'commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('blob', 'tree', 'commit', 'commitsummary', 'ref', 'tag')
 
@@ -59,6 +60,8 @@ def add_commit(commit):
             )
     if commit.type == 'commit' and 'tree' in types_to_include:
         add_tree(commit, commit.tree)
+    if commit.type == 'commit' and 'commitdetails' in types_to_include:
+        add_commit_details(commit)
 
 
 def add_ellipsis(commit):
@@ -71,6 +74,21 @@ def add_ellipsis(commit):
            )
     if commit.type == 'commit' and 'tree' in types_to_include:
         add_tree(commit, commit.tree)
+
+
+def add_commit_details(commit):
+    node_id = commit.hexsha + '-details'
+    details = '\n'.join([commit.author.name,
+                         commit.authored_datetime.isoformat(),
+                         commit.message[:40] + '...'])
+    gv.node(node_id,
+            label=details,
+            color=type_colors['commitdetails'].line_color,
+            style='filled',
+            fillcolor=type_colors['commitdetails'].fill_color,
+            penwidth='2',
+            )
+    add_edge(commit.hexsha, node_id)
 
 
 def add_tree(parent, tree):
@@ -153,8 +171,13 @@ def add_edge(git_obj, parent):
         if git_obj.hexsha + parent.hexsha not in edges:
             edges[git_obj.hexsha + parent.hexsha] = None
             gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
-    elif type(git_obj) == str:
-        gv.edge(git_obj, parent, label='Head')
+    elif type(git_obj) == str and type(parent) == str:
+        if git_obj + parent not in edges:
+            edges[git_obj + parent] = None
+            if git_obj == 'HEAD':
+                gv.edge(git_obj, parent, label='Head')
+            else:
+                gv.edge(git_obj, parent, label='details')
     else:
         raise Exception('unknown type: %s' % type(git_obj))
 
