@@ -30,9 +30,11 @@ types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('tree', 'commit', 'commitsummary', 'ref', 'tag')
 # types_to_include = ('blob', 'tree', 'commit', 'commitsummary', 'ref', 'tag')
 
-collapse_commits = True
+collapse_commits = False
 branch_diagram = False
 include_remotes = True
+max_depth = 5
+head_only = False
 
 gv = graphviz.Digraph(format='svg')
 gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
@@ -50,6 +52,18 @@ repo = git.Repo('.')
 def add_commit(commit):
     gv.node(commit.hexsha,
             label=commit.hexsha[:hash_length],
+            color=type_colors[commit.type].line_color,
+            style='filled',
+            fillcolor=type_colors[commit.type].fill_color,
+            penwidth='2',
+            )
+    if commit.type == 'commit' and 'tree' in types_to_include:
+        add_tree(commit, commit.tree)
+
+
+def add_ellipsis(commit):
+    gv.node(commit.hexsha,
+            label='...',
             color=type_colors[commit.type].line_color,
             style='filled',
             fillcolor=type_colors[commit.type].fill_color,
@@ -164,10 +178,13 @@ def boring(commit):
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 logging.info('Pre-scanning the tree...')
-if include_remotes:
+if head_only:
+    refs = [x for x in repo.refs if x.path == repo.head.ref.path]
+elif include_remotes:
     refs = repo.refs
 else:
     refs = [x for x in repo.refs if 'remote' not in x.path]
+
 for git_obj in refs:
     if type(git_obj) == git.Head:
         logging.info('Scanning head %s...', git_obj.path)
@@ -232,43 +249,54 @@ for git_obj in refs:
 
     collapsing = False
     collapsed_commits = 0
+    depth = 0
     while obj:
-        if collapse_commits and collapsing:
-            if boring(obj):
-                last_collapsed_commit = obj
-                collapsed_commits += 1
-            else:
-                if collapsed_commits == 1:
-                    add_commit(first_collapsed_commit)
-                    add_edge(first_collapsed_commit, obj)
-                else:
-                    add_collapsed_commits(first_collapsed_commit.hexsha,
-                                          last_collapsed_commit.hexsha,
-                                          collapsed_commits)
-                    add_edge(first_collapsed_commit, obj)
-                    # Now add this non-boring commit
-                add_commit(obj)
-                if obj.parents:
-                    add_edge(obj, obj.parents[0])
-                    for parent in obj.parents[1:]:
-                        add_edge(obj, parent)
-                collapsing = False
-                collapsed_commits = 0
-        else:
-            if collapse_commits and boring(obj):
-                collapsing = True
-                first_collapsed_commit = obj
-                collapsed_commits = 1
-            else:
-                add_commit(obj)
-                if obj.parents:
-                    add_edge(obj, obj.parents[0])
-                    for parent in obj.parents[1:]:
-                        add_edge(obj, parent)
-        if obj.parents:
-            obj = obj.parents[0]
-        else:
+        depth += 1
+        if depth > max_depth:
+            if collapse_commits and collapsing:
+                add_collapsed_commits(first_collapsed_commit.hexsha,
+                                      last_collapsed_commit.hexsha,
+                                      collapsed_commits)
+                add_edge(first_collapsed_commit, obj)
+            add_ellipsis(obj)
             obj = None
+        else:
+            if collapse_commits and collapsing:
+                if boring(obj):
+                    last_collapsed_commit = obj
+                    collapsed_commits += 1
+                else:
+                    if collapsed_commits == 1:
+                        add_commit(first_collapsed_commit)
+                        add_edge(first_collapsed_commit, obj)
+                    else:
+                        add_collapsed_commits(first_collapsed_commit.hexsha,
+                                              last_collapsed_commit.hexsha,
+                                              collapsed_commits)
+                        add_edge(first_collapsed_commit, obj)
+                        # Now add this non-boring commit
+                    add_commit(obj)
+                    if obj.parents:
+                        add_edge(obj, obj.parents[0])
+                        for parent in obj.parents[1:]:
+                            add_edge(obj, parent)
+                    collapsing = False
+                    collapsed_commits = 0
+            else:
+                if collapse_commits and boring(obj):
+                    collapsing = True
+                    first_collapsed_commit = obj
+                    collapsed_commits = 1
+                else:
+                    add_commit(obj)
+                    if obj.parents:
+                        add_edge(obj, obj.parents[0])
+                        for parent in obj.parents[1:]:
+                            add_edge(obj, parent)
+            if obj.parents:
+                obj = obj.parents[0]
+            else:
+                obj = None
 
 add_sym_ref('HEAD', repo.head.ref.path)
 add_edge('HEAD', repo.head.ref.path)
