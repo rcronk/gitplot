@@ -79,8 +79,8 @@ def add_ellipsis(commit):
 def add_commit_details(commit):
     node_id = commit.hexsha + '-details'
     details = '\n'.join([commit.author.name,
-                         commit.authored_datetime.isoformat(),
-                         commit.message[:40] + '...'])
+                         commit.message[:40],
+                         commit.authored_datetime.isoformat() + '...'])
     gv.node(node_id,
             label=details,
             color=type_colors['commitdetails'].line_color,
