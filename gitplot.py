@@ -24,8 +24,22 @@ class GitPlot(object):
         def fill_color(self):
             return self._fill_color
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, arguments):
+        """ Entry point for command line. """
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+        logging.info('gitplot %s', __version__)
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--repo-path', help='Path to the git repo.', default='.')
+        parser.add_argument('--object-types', help='Which object types to display.', nargs='+', type=str, default=['commit', 'ref', 'tag'])
+        parser.add_argument('--collapse-commits', action="store_true", default=True)
+        parser.add_argument('--include-remotes', action="store_true", default=False)
+        args = parser.parse_args(arguments)
+
+        logging.info('args: %s', args)
+
+        # parse stuff and store in self.*
+
         self.gv = graphviz.Digraph(format='svg')
         self.gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
 
@@ -337,22 +351,7 @@ class GitPlot(object):
 
 
 def main(arguments):
-    """ Entry point for command line. """
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-    logging.info('gitplot %s', __version__)
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--repo-path', help='Path to the git repo.', default='.')
-    parser.add_argument('--object-types', help='Which object types to display.', nargs='+', type=str, default=['commit', 'ref', 'tag'])
-    parser.add_argument('--collapse-commits', action="store_true", default=True)
-    parser.add_argument('--include-remotes', action="store_true", default=False)
-    args = parser.parse_args(arguments)
-
-    logging.info('args: %s', args)
-
-    config = {}
-
-    gp = GitPlot(config=config)
+    gp = GitPlot(arguments)
     gp.create_graph()
 
 
