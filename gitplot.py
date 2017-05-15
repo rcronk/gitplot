@@ -30,10 +30,19 @@ class GitPlot(object):
         logging.info('gitplot %s', __version__)
 
         parser = argparse.ArgumentParser()
-        parser.add_argument('--repo-path', help='Path to the git repo.', default='.')
-        parser.add_argument('--object-types', help='Which object types to display.', nargs='+', type=str, default=['commit', 'ref', 'tag'])
-        parser.add_argument('--collapse-commits', action="store_true", default=True)
-        parser.add_argument('--include-remotes', action="store_true", default=False)
+        parser.add_argument('--repo-path', help='Path to the git repo.',
+#                            default=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+#                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+#                            default=r'C:\Users\24860\code\git\devtools')
+#                            default=r'C:\Users\24860\code\git\common')
+#                            default=r'C:\Users\24860\Documents\hti')
+#                            default=r'C:\ftl')
+#                            default=r'C:\Users\cronk\PycharmProjects\mutate')
+                            default=r'.')
+        parser.add_argument('--include-trees-blobs', help='Include trees and blobs.', action='store_true', default=False)
+        parser.add_argument('--max-commit-depth', type=int, default=10)
+        parser.add_argument('--collapse-commits', action="store_true", default=False)
+        parser.add_argument('--exclude-remotes', action="store_true", default=False)
         args = parser.parse_args(arguments)
 
         logging.info('args: %s', args)
@@ -41,28 +50,18 @@ class GitPlot(object):
         # parse stuff and store in self.*
 
         self.gv = graphviz.Digraph(format='svg')
-        self.gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit on the left)
+        self.gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit appear on the far left)
 
-        self.types_to_include = ('commit', 'commitsummary', 'commitdetails', 'ref', 'tag')
-        # self.types_to_include = ('commit', 'commitsummary', 'ref', 'tag')
-        # self.types_to_include = ('tree', 'commit', 'commitsummary', 'ref', 'tag')
-        # self.types_to_include = ('blob', 'tree', 'commit', 'commitsummary', 'ref', 'tag')
+        self.include_trees_blobs = args.include_trees_blobs
 
-        self.collapse_commits = True
+        self.collapse_commits = args.collapse_commits
         self.branch_diagram = False
-        self.include_remotes = True
-        self.max_depth = 100
+        self.include_remotes = args.exclude_remotes
+        self.max_depth = args.max_commit_depth
         self.head_only = False
-        self.commit_details = False
+        self.include_commit_details = False
 
-        # self.repo = git.Repo(r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-        # self.repo = git.Repo(r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-        # self.repo = git.Repo(r'C:\Users\cronk\PycharmProjects\mutate')
-        # self.repo = git.Repo(r'C:\Users\24860\code\git\devtools')
-        # self.repo = git.Repo(r'C:\Users\24860\code\git\common')
-        # self.repo = git.Repo(r'C:\Users\24860\Documents\hti')
-        # self.repo = git.Repo(r'C:\ftl')
-        self.repo = git.Repo('.')
+        self.repo = git.Repo(args.repo_path)
 
         self.refs = []
 
@@ -87,9 +86,9 @@ class GitPlot(object):
                 fillcolor=self.type_colors[commit.type].fill_color,
                 penwidth='2',
                 )
-        if commit.type == 'commit' and 'tree' in self.types_to_include:
+        if commit.type == 'commit' and self.include_trees_blobs:
             self.add_tree(commit, commit.tree)
-        if commit.type == 'commit' and self.commit_details:
+        if commit.type == 'commit' and self.include_commit_details:
             self.add_commit_details(commit)
 
     def add_ellipsis(self, commit):
@@ -100,14 +99,14 @@ class GitPlot(object):
                 fillcolor=self.type_colors[commit.type].fill_color,
                 penwidth='2',
                )
-        if commit.type == 'commit' and 'tree' in self.types_to_include:
+        if commit.type == 'commit' and self.include_trees_blobs:
             self.add_tree(commit, commit.tree)
 
     def add_commit_details(self, commit):
         node_id = commit.hexsha + '-details'
         details = '\n'.join([commit.author.name,
-                             commit.message[:40],
-                             commit.authored_datetime.isoformat() + '...'])
+                             commit.message[:40] + '...',
+                             commit.authored_datetime.isoformat()])
         self.gv.node(node_id,
                 label=details,
                 color=self.type_colors['commitdetails'].line_color,
@@ -127,7 +126,7 @@ class GitPlot(object):
                 penwidth='2',
                )
         self.add_edge(parent, tree)
-        if 'blob' in self.types_to_include:
+        if self.include_trees_blobs:
             for blob in tree.blobs:
                 self.add_blob(tree, blob)
         for child_tree in tree.trees:
