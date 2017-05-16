@@ -32,8 +32,8 @@ class GitPlot(object):
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path', help='Path to the git repo.',
 #                            default=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-#                            default=r'C:\Users\24860\code\git\devtools')
+#                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+                            default=r'C:\Users\24860\code\git\devtools')
 #                            default=r'C:\Users\24860\code\git\common')
 #                            default=r'C:\Users\24860\Documents\hti')
 #                            default=r'C:\ftl')
@@ -187,7 +187,7 @@ class GitPlot(object):
             if git_obj.hexsha + parent.hexsha not in self.edges:
                 self.edges[git_obj.hexsha + parent.hexsha] = None
                 self.gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
-        elif type(git_obj) == str and type(parent) == str:
+        elif type(git_obj) in (str, unicode) and type(parent) in (str, unicode):
             if git_obj + parent not in self.edges:
                 self.edges[git_obj + parent] = None
                 if git_obj == 'HEAD':
@@ -198,16 +198,17 @@ class GitPlot(object):
             raise Exception('unknown type: %s' % type(git_obj))
 
     def boring(self, commit):
-        branch_point = commit.hexsha not in [x for x in self.all_children if len(self.all_children[x]) > 1]
         parents = len(commit.parents)
-        if commit in self.all_children:
-            children = len(self.all_children[commit])
-        else:
-            children = 0
         num_refs = len([x for x in commit.repo.refs if type(x) in (git.Head, git.RemoteReference) and x.object.hexsha == commit.hexsha])
         if self.args.branch_diagram:  # This doesn't work yet.
-            return parents == 1 or not branch_point
+            branch_points = [x.hexsha for x in self.all_children if len(self.all_children[x]) > 1]
+            branch_point = commit.hexsha in branch_points
+            return parents == 1 and num_refs == 0 and not branch_point
         else:
+            if commit in self.all_children:
+                children = len(self.all_children[commit])
+            else:
+                children = 0
             return parents == 1 and children == 1 and num_refs == 0
 
     def pre_scan(self):
