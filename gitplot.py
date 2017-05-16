@@ -32,36 +32,32 @@ class GitPlot(object):
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path', help='Path to the git repo.',
 #                            default=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-#                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 #                            default=r'C:\Users\24860\code\git\devtools')
 #                            default=r'C:\Users\24860\code\git\common')
 #                            default=r'C:\Users\24860\Documents\hti')
 #                            default=r'C:\ftl')
 #                            default=r'C:\Users\cronk\PycharmProjects\mutate')
-                            default=r'.')
+#                            default=r'.')
         parser.add_argument('--include-trees-blobs', help='Include trees and blobs.', action='store_true', default=False)
         parser.add_argument('--max-commit-depth', type=int, default=10)
+        parser.add_argument('--output-format', type=str, default='svg')
+        parser.add_argument('--rank-direction', type=str, default='RL')
         parser.add_argument('--collapse-commits', action="store_true", default=False)
         parser.add_argument('--exclude-remotes', action="store_true", default=False)
-        args = parser.parse_args(arguments)
+        parser.add_argument('--head-only', action="store_true", default=False)
+        parser.add_argument('--branch-diagram', action="store_true", default=False)
+        parser.add_argument('--commit-details', action="store_true", default=False)
+        self.args = parser.parse_args(arguments)
 
-        logging.info('args: %s', args)
+        logging.info('args: %s', self.args)
 
         # parse stuff and store in self.*
 
-        self.gv = graphviz.Digraph(format='svg')
-        self.gv.graph_attr['rankdir'] = 'RL'  # Right to left (which makes the first commit appear on the far left)
+        self.gv = graphviz.Digraph(format=self.args.output_format)
+        self.gv.graph_attr['rankdir'] = self.args.rank_direction  # Right to left (which makes the first commit appear on the far left)
 
-        self.include_trees_blobs = args.include_trees_blobs
-
-        self.collapse_commits = args.collapse_commits
-        self.branch_diagram = False
-        self.include_remotes = args.exclude_remotes
-        self.max_depth = args.max_commit_depth
-        self.head_only = False
-        self.include_commit_details = False
-
-        self.repo = git.Repo(args.repo_path)
+        self.repo = git.Repo(self.args.repo_path)
 
         self.refs = []
 
@@ -86,9 +82,9 @@ class GitPlot(object):
                 fillcolor=self.type_colors[commit.type].fill_color,
                 penwidth='2',
                 )
-        if commit.type == 'commit' and self.include_trees_blobs:
+        if commit.type == 'commit' and self.args.include_trees_blobs:
             self.add_tree(commit, commit.tree)
-        if commit.type == 'commit' and self.include_commit_details:
+        if commit.type == 'commit' and self.args.commit_details:
             self.add_commit_details(commit)
 
     def add_ellipsis(self, commit):
@@ -99,7 +95,7 @@ class GitPlot(object):
                 fillcolor=self.type_colors[commit.type].fill_color,
                 penwidth='2',
                )
-        if commit.type == 'commit' and self.include_trees_blobs:
+        if commit.type == 'commit' and self.args.include_trees_blobs:
             self.add_tree(commit, commit.tree)
 
     def add_commit_details(self, commit):
@@ -126,7 +122,7 @@ class GitPlot(object):
                 penwidth='2',
                )
         self.add_edge(parent, tree)
-        if self.include_trees_blobs:
+        if self.args.include_trees_blobs:
             for blob in tree.blobs:
                 self.add_blob(tree, blob)
         for child_tree in tree.trees:
@@ -209,16 +205,16 @@ class GitPlot(object):
         else:
             children = 0
         num_refs = len([x for x in commit.repo.refs if type(x) in (git.Head, git.RemoteReference) and x.object.hexsha == commit.hexsha])
-        if self.branch_diagram:  # This doesn't work yet.
+        if self.args.branch_diagram:  # This doesn't work yet.
             return parents == 1 or not branch_point
         else:
             return parents == 1 and children == 1 and num_refs == 0
 
     def pre_scan(self):
         logging.info('Pre-scanning the tree...')
-        if self.head_only:
+        if self.args.head_only:
             self.refs = [x for x in self.repo.refs if x.path == self.repo.head.ref.path]
-        elif self.include_remotes:
+        elif not self.args.exclude_remotes:
             self.refs = self.repo.refs
         else:
             self.refs = [x for x in self.repo.refs if 'remote' not in x.path]
@@ -291,8 +287,8 @@ class GitPlot(object):
             depth = 0
             while obj:
                 depth += 1
-                if depth > self.max_depth:
-                    if self.collapse_commits and collapsing:
+                if depth > self.args.max_commit_depth:
+                    if self.args.collapse_commits and collapsing:
                         self.add_collapsed_commits(first_collapsed_commit.hexsha,
                                               last_collapsed_commit.hexsha,
                                               collapsed_commits)
@@ -300,7 +296,7 @@ class GitPlot(object):
                     self.add_ellipsis(obj)
                     obj = None
                 else:
-                    if self.collapse_commits and collapsing:
+                    if self.args.collapse_commits and collapsing:
                         if self.boring(obj):
                             last_collapsed_commit = obj
                             collapsed_commits += 1
@@ -322,7 +318,7 @@ class GitPlot(object):
                             collapsing = False
                             collapsed_commits = 0
                     else:
-                        if self.collapse_commits and self.boring(obj):
+                        if self.args.collapse_commits and self.boring(obj):
                             collapsing = True
                             first_collapsed_commit = obj
                             collapsed_commits = 1
