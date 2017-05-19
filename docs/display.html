@@ -2,30 +2,29 @@
 <html>
 <head>
 <script>
-function startTime() {
-    var today = new Date();
-    var h = today.getHours();
-    var m = today.getMinutes();
-    var s = today.getSeconds();
-    m = checkTime(m);
-    s = checkTime(s);
-    document.getElementById('txt').innerHTML =
-    h + ":" + m + ":" + s;
-    var t = setTimeout(startTime, 500);
-}
-function checkTime(i) {
-    if (i < 10) {i = "0" + i};  // add zero in front of numbers < 10
-    return i;
+function updateImage()
+{
+    var image = document.getElementById("svg1");
+    if(image.complete) {
+        var new_image = new Image();
+        //set up the new image
+        new_image.id = "svg1";
+        new_image.src = image.src + "?" + new Date().getTime();
+        // insert new image and remove old
+        image.parentNode.insertBefore(new_image,image);
+        image.parentNode.removeChild(image);
+    }
+
+    setTimeout(updateImage, 1000);
 }
 </script>
 </head>
 
-<body onload="startTime()">
-<object id="svg1" data="git.svg" type="image/svg+xml"></object>
+<body onload="updateImage()">
+<object id="svg1" data="../git.svg" type="image/svg+xml"></object>
 <div id="txt"></div>
 
 <!-- <META HTTP-EQUIV="refresh" CONTENT="1"> -->
 
 </body>
 </html>
-

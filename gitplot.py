@@ -1,4 +1,5 @@
 """ GitPlot - The git plotter. """
+from builtins import str
 import sys
 import math
 import logging
@@ -33,12 +34,12 @@ class GitPlot(object):
         parser.add_argument('--repo-path', help='Path to the git repo.',
 #                            default=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 #                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-                            default=r'C:\Users\24860\code\git\devtools')
+#                            default=r'C:\Users\24860\code\git\devtools')
 #                            default=r'C:\Users\24860\code\git\common')
 #                            default=r'C:\Users\24860\Documents\hti')
 #                            default=r'C:\ftl')
 #                            default=r'C:\Users\cronk\PycharmProjects\mutate')
-#                            default=r'.')
+                            default=r'.')
         parser.add_argument('--include-trees-blobs', help='Include trees and blobs.', action='store_true', default=False)
         parser.add_argument('--max-commit-depth', type=int, default=10)
         parser.add_argument('--output-format', type=str, default='svg')
@@ -187,7 +188,7 @@ class GitPlot(object):
             if git_obj.hexsha + parent.hexsha not in self.edges:
                 self.edges[git_obj.hexsha + parent.hexsha] = None
                 self.gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
-        elif type(git_obj) in (str, unicode) and type(parent) in (str, unicode):
+        elif type(git_obj) == str and type(parent) == str:
             if git_obj + parent not in self.edges:
                 self.edges[git_obj + parent] = None
                 if git_obj == 'HEAD':
