@@ -1,6 +1,7 @@
 """ GitPlot - The git plotter. """
 from builtins import str
 import sys
+import os
 import math
 import logging
 import argparse
@@ -38,8 +39,8 @@ class GitPlot(object):
 #                            default=r'C:\Users\24860\code\git\common')
 #                            default=r'C:\Users\24860\Documents\hti')
 #                            default=r'C:\ftl')
-#                            default=r'C:\Users\cronk\PycharmProjects\mutate')
-                            default=r'.')
+                            default=r'C:\Users\cronk\PycharmProjects\mutate')
+#                            default=r'.')
         parser.add_argument('--include-trees-blobs', help='Include trees and blobs.', action='store_true', default=False)
         parser.add_argument('--max-commit-depth', type=int, default=10)
         parser.add_argument('--output-format', type=str, default='svg')
@@ -55,7 +56,7 @@ class GitPlot(object):
 
         # parse stuff and store in self.*
 
-        self.gv = graphviz.Digraph(format=self.args.output_format)
+        self.gv = graphviz.Digraph(format=self.args.output_format, engine='dot')
         self.gv.graph_attr['rankdir'] = self.args.rank_direction  # Right to left (which makes the first commit appear on the far left)
 
         self.repo = git.Repo(self.args.repo_path)
@@ -338,8 +339,9 @@ class GitPlot(object):
         self.add_sym_ref('HEAD', self.repo.head.ref.path)
         self.add_edge('HEAD', self.repo.head.ref.path)
 
-        logging.info('Rendering graph...')
-        self.gv.render('git')
+        output_filename = os.path.basename(self.repo.working_tree_dir)
+        logging.info('Rendering graph %s...' % output_filename)
+        self.gv.render(filename=output_filename, view=True, cleanup=True)
         logging.info('Done.')
 
     def create_graph(self):
