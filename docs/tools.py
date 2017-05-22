@@ -5,7 +5,7 @@ import random
 import string
 
 
-class RepoCreator(object):
+class RepoTools(object):
     def __init__(self):
         self.dir_name = tempfile.mkdtemp(prefix='temprepo-')
         print('Repo directory: %s' % self.dir_name)
@@ -17,6 +17,7 @@ class RepoCreator(object):
         os.chdir(self.dir_name)
         output = subprocess.check_output(cmd).decode('utf-8', errors='replace').strip()
         os.chdir(old_dir)
+        print(subprocess.check_output('python ..\gitplot.py --repo-path="%s" --include-trees-blobs' % self.dir_name))
         return output
 
     @staticmethod
@@ -25,6 +26,10 @@ class RepoCreator(object):
 
     def create_file(self, name):
         with open(os.path.join(self.dir_name, name), 'w') as f:
+            f.write(self.get_random_string())
+
+    def modify_file(self, name):
+        with open(os.path.join(self.dir_name, name), 'a') as f:
             f.write(self.get_random_string())
 
     def commit_file(self, name, message='Default message.'):
@@ -40,9 +45,10 @@ class RepoCreator(object):
             print('Invalid tag type: "%s"' % tag_type)
 
 
-r = RepoCreator()
-for filename, tag_type in (('file1.txt', 'lightweight'),
-                           ('file2.txt', 'annotated')):
-    r.create_file(filename)
-    r.commit_file(filename)
-    r.create_tag('Tag-for-%s' % filename, tag_type=tag_type)
+if __name__ == "__main__":
+    r = RepoTools()
+    for filename, tag_type in (('file1.txt', 'lightweight'),
+                               ('file2.txt', 'annotated')):
+        r.create_file(filename)
+        r.commit_file(filename)
+        r.create_tag('Tag-for-%s' % filename, tag_type=tag_type)

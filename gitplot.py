@@ -67,7 +67,7 @@ class GitPlot(object):
         self.all_children = {}
 
         self.type_colors = {}
-        object_types = ['ref', 'tag', 'commit', 'commitsummary', 'commitdetails', 'tree', 'blob']
+        object_types = ['ref', 'tag', 'commit', 'commitsummary', 'tree', 'blob']
         hue_step = 1.0 / len(object_types)
         hue = 0.000
         for object_type in object_types:
@@ -76,9 +76,14 @@ class GitPlot(object):
             self.type_colors[object_type] = GitPlot.Colors(line, fill)
             hue += hue_step
 
+        self.hash_length = 5  # Will be adjusted later
+
     def add_commit(self, commit):
+        label = commit.hexsha[:self.hash_length]
+        if commit.type == 'commit' and self.args.commit_details:
+            label += '\n' + self.get_commit_details(commit)
         self.gv.node(commit.hexsha,
-                label=commit.hexsha[:self.hash_length],
+                label=label,
                 color=self.type_colors[commit.type].line_color,
                 style='filled',
                 fillcolor=self.type_colors[commit.type].fill_color,
@@ -86,8 +91,6 @@ class GitPlot(object):
                 )
         if commit.type == 'commit' and self.args.include_trees_blobs:
             self.add_tree(commit, commit.tree)
-        if commit.type == 'commit' and self.args.commit_details:
-            self.add_commit_details(commit)
 
     def add_ellipsis(self, commit):
         self.gv.node(commit.hexsha,
@@ -100,20 +103,14 @@ class GitPlot(object):
         if commit.type == 'commit' and self.args.include_trees_blobs:
             self.add_tree(commit, commit.tree)
 
-    def add_commit_details(self, commit):
-        node_id = commit.hexsha + '-details'
-        details = '\n'.join([commit.author.name,
-                             commit.message[:40] + '...',
-                             commit.authored_datetime.isoformat()])
-        self.gv.node(node_id,
-                label=details,
-                color=self.type_colors['commitdetails'].line_color,
-                style='filled',
-                fillcolor=self.type_colors['commitdetails'].fill_color,
-                penwidth='2',
-                )
-        self.add_edge(commit.hexsha, node_id)
-
+    def get_commit_details(self, commit):
+        if len(commit.message) > 40:
+            message = commit.message[:40] + '...'
+        else:
+            message = commit.message
+        return '\n'.join([commit.author.name,
+                          message,
+                          commit.authored_datetime.isoformat()])
 
     def add_tree(self, parent, tree):
         self.gv.node(tree.hexsha,
@@ -253,7 +250,8 @@ class GitPlot(object):
 
         # Calculate the length of the short hash based on the total number of objects
         num_objects = len(self.all_children)
-        self.hash_length = max(1, int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2)))
+        if num_objects:
+            self.hash_length = max(5, int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2)))
 
         logging.info('Pre-scan finished.')
         logging.info('%d objects found.', num_objects)
