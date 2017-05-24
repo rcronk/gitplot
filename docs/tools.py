@@ -27,10 +27,12 @@ class RepoTools(object):
     def create_file(self, name):
         with open(os.path.join(self.dir_name, name), 'w') as f:
             f.write(self.get_random_string())
+        print(subprocess.check_output('python ..\gitplot.py --repo-path="%s" --include-trees-blobs' % self.dir_name))
 
     def modify_file(self, name):
         with open(os.path.join(self.dir_name, name), 'a') as f:
             f.write(self.get_random_string())
+        print(subprocess.check_output('python ..\gitplot.py --repo-path="%s" --include-trees-blobs' % self.dir_name))
 
     def commit_file(self, name, message='Default message.'):
         self.run(['git', 'add', name])

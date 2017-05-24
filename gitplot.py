@@ -34,13 +34,13 @@ class GitPlot(object):
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path', help='Path to the git repo.',
 #                            default=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-#                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 #                            default=r'C:\Users\24860\code\git\devtools')
 #                            default=r'C:\Users\24860\code\git\common')
 #                            default=r'C:\Users\24860\Documents\hti')
 #                            default=r'C:\ftl')
 #                            default=r'C:\Users\cronk\PycharmProjects\mutate')
-                            default=r'.')
+#                            default=r'.')
         parser.add_argument('--include-trees-blobs', help='Include trees and blobs.', action='store_true', default=False)
         parser.add_argument('--max-commit-depth', type=int, default=10)
         parser.add_argument('--output-format', type=str, default='svg')
@@ -65,9 +65,11 @@ class GitPlot(object):
 
         self.edges = {}
         self.all_children = {}
+        self.all_blobs = {}
 
         self.type_colors = {}
-        object_types = ['ref', 'tag', 'commit', 'commitsummary', 'tree', 'blob']
+        object_types = ['ref', 'tag', 'commit', 'commit_summary', 'tree', 'blob', 'changed_index_entry',
+                        'changed_nonindex_entry', 'untracked_file']
         hue_step = 1.0 / len(object_types)
         hue = 0.000
         for object_type in object_types:
@@ -128,14 +130,61 @@ class GitPlot(object):
             self.add_tree(tree, child_tree)
 
     def add_blob(self, tree, blob):
+        self.all_blobs[blob.hexsha] = None
         self.gv.node(blob.hexsha,
-                label=blob.hexsha[:self.hash_length],
-                color=self.type_colors[blob.type].line_color,
+                     label=blob.hexsha[:self.hash_length],
+                     color=self.type_colors[blob.type].line_color,
+                     style='filled',
+                     fillcolor=self.type_colors[blob.type].fill_color,
+                     penwidth='2',
+                     )
+        self.add_edge(tree, blob)
+
+    def add_index(self):
+        self.gv.node('Index',
+                     label='Index',
+                     color=self.type_colors['blob'].line_color,
+                     style='filled',
+                     fillcolor=self.type_colors['blob'].fill_color,
+                     penwidth='2',
+                     )
+
+    def add_index_entry(self, index_entry):
+        if index_entry.hexsha in self.all_blobs:
+            if index_entry.path in [x.a_path for x in self.repo.index.diff(None)]:
+                type = 'changed_nonindex_entry'
+            else:
+                type = 'blob'
+        else:
+            type = 'changed_index_entry'
+        label = '%s\n%s' % (index_entry.path, index_entry.hexsha[:self.hash_length])
+        self.gv.node(label,
+                     label=label,
+                     color=self.type_colors[type].line_color,
+                     style='filled',
+                     fillcolor=self.type_colors[type].fill_color,
+                     penwidth='2',
+                     )
+        self.add_edge('Index', label)
+
+    def add_untracked(self):
+        self.gv.node('Untracked',
+                     label='Untracked',
+                     color=self.type_colors['untracked_file'].line_color,
+                     style='filled',
+                     fillcolor=self.type_colors['untracked_file'].fill_color,
+                     penwidth='2',
+                     )
+
+    def add_untracked_file(self, untracked_file):
+        self.gv.node(untracked_file,
+                label=untracked_file,
+                color=self.type_colors['untracked_file'].line_color,
                 style='filled',
-                fillcolor=self.type_colors[blob.type].fill_color,
+                fillcolor=self.type_colors['untracked_file'].fill_color,
                 penwidth='2',
                )
-        self.add_edge(tree, blob)
+        self.add_edge('Untracked', untracked_file)
 
     def add_collapsed_commits(self, first_hexsha, last_hexsha, commits):
         label = '%s (%d) %s' % (last_hexsha[:self.hash_length],
@@ -143,9 +192,9 @@ class GitPlot(object):
                                 first_hexsha[:self.hash_length])
         self.gv.node(first_hexsha,
                 label=label,
-                color=self.type_colors['commitsummary'].line_color,
+                color=self.type_colors['commit_summary'].line_color,
                 style='filled',
-                fillcolor=self.type_colors['commitsummary'].fill_color,
+                fillcolor=self.type_colors['commit_summary'].fill_color,
                 penwidth='2',
                )
 
@@ -171,7 +220,7 @@ class GitPlot(object):
         if type(git_obj) in (git.Head, git.TagReference, git.RemoteReference):
             if git_obj.path + parent.hexsha not in self.edges:
                 self.edges[git_obj.path + parent.hexsha] = None
-                label = str(type(git_obj))
+                label = str(type(git_obj)).lower()
                 label = label.split('.')[-1][:-2]
                 self.gv.edge(git_obj.path, parent.hexsha, label=label)
         elif type(git_obj) in (git.Commit, git.TagObject) and type(parent) in (git.Commit, git.TagObject):
@@ -190,9 +239,13 @@ class GitPlot(object):
             if git_obj + parent not in self.edges:
                 self.edges[git_obj + parent] = None
                 if git_obj == 'HEAD':
-                    self.gv.edge(git_obj, parent, label='Head')
+                    self.gv.edge(git_obj, parent, label='head')
+                elif git_obj == 'Index':
+                    self.gv.edge(git_obj, parent, label='index')
+                elif git_obj == 'Untracked':
+                    self.gv.edge(git_obj, parent, label='untracked')
                 else:
-                    self.gv.edge(git_obj, parent, label='details')
+                    raise Exception('Unknown object type: %s' % git_obj)
         else:
             raise Exception('unknown type: %s' % type(git_obj))
 
@@ -336,6 +389,14 @@ class GitPlot(object):
 
         self.add_sym_ref('HEAD', self.repo.head.ref.path)
         self.add_edge('HEAD', self.repo.head.ref.path)
+
+        self.add_index()
+        for key in self.repo.index.entries:
+            self.add_index_entry(self.repo.index.entries[key])
+
+        self.add_untracked()
+        for untracked_file in self.repo.untracked_files:
+            self.add_untracked_file(untracked_file)
 
         output_filename = os.path.basename(self.repo.working_tree_dir)
         logging.info('Rendering graph %s...' % output_filename)
