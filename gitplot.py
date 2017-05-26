@@ -1,5 +1,5 @@
 """ GitPlot - The git plotter. """
-from builtins import str
+from __builtin__ import str  # __builtin__ vs. builtins
 import sys
 import os
 import math
@@ -246,7 +246,7 @@ class GitPlot(object):
             if git_obj.hexsha + parent.hexsha not in self.edges:
                 self.edges[git_obj.hexsha + parent.hexsha] = None
                 self.gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
-        elif type(git_obj) == str and type(parent) == str:
+        elif type(git_obj) in (str, unicode) and type(parent) in (str, unicode):
             if git_obj + parent not in self.edges:
                 self.edges[git_obj + parent] = None
                 if git_obj == 'HEAD':
