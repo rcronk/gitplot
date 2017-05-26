@@ -34,13 +34,13 @@ class GitPlot(object):
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path', help='Path to the git repo.',
 #                            default=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
+#                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
 #                            default=r'C:\Users\24860\code\git\devtools')
 #                            default=r'C:\Users\24860\code\git\common')
 #                            default=r'C:\Users\24860\Documents\hti')
 #                            default=r'C:\ftl')
 #                            default=r'C:\Users\cronk\PycharmProjects\mutate')
-#                            default=r'.')
+                            default=r'.')
         parser.add_argument('--include-trees-blobs', help='Include trees and blobs.', action='store_true', default=False)
         parser.add_argument('--max-commit-depth', type=int, default=10)
         parser.add_argument('--output-format', type=str, default='svg')
@@ -148,15 +148,25 @@ class GitPlot(object):
                      fillcolor=self.type_colors['blob'].fill_color,
                      penwidth='2',
                      )
+        self.gv.node('Changed',
+                     label='Changed',
+                     color=self.type_colors['changed_nonindex_entry'].line_color,
+                     style='filled',
+                     fillcolor=self.type_colors['changed_nonindex_entry'].fill_color,
+                     penwidth='2',
+                     )
 
     def add_index_entry(self, index_entry):
         if index_entry.hexsha in self.all_blobs:
             if index_entry.path in [x.a_path for x in self.repo.index.diff(None)]:
                 type = 'changed_nonindex_entry'
+                edges = ['Changed']
             else:
                 type = 'blob'
+                edges = ['Index']
         else:
             type = 'changed_index_entry'
+            edges = ['Changed', 'Index']
         label = '%s\n%s' % (index_entry.path, index_entry.hexsha[:self.hash_length])
         self.gv.node(label,
                      label=label,
@@ -165,7 +175,8 @@ class GitPlot(object):
                      fillcolor=self.type_colors[type].fill_color,
                      penwidth='2',
                      )
-        self.add_edge('Index', label)
+        for edge in edges:
+            self.add_edge(edge, label)
 
     def add_untracked(self):
         self.gv.node('Untracked',
@@ -244,6 +255,8 @@ class GitPlot(object):
                     self.gv.edge(git_obj, parent, label='index')
                 elif git_obj == 'Untracked':
                     self.gv.edge(git_obj, parent, label='untracked')
+                elif git_obj == 'Changed':
+                    self.gv.edge(git_obj, parent, label='changed')
                 else:
                     raise Exception('Unknown object type: %s' % git_obj)
         else:
