@@ -8,6 +8,7 @@ import os
 import math
 import logging
 import argparse
+import hashlib
 
 import graphviz
 import git
@@ -164,13 +165,15 @@ class GitPlot(object):
             if index_entry.path in [x.a_path for x in self.repo.index.diff(None)]:
                 type = 'changed_nonindex_entry'
                 edges = ['Changed']
+                label = '%s\n%s' % (index_entry.path, self.blob_hash(index_entry.path)[:self.hash_length])
             else:
                 type = 'blob'
                 edges = ['Index']
+                label = '%s\n%s' % (index_entry.path, index_entry.hexsha[:self.hash_length])
         else:
             type = 'changed_index_entry'
             edges = ['Changed', 'Index']
-        label = '%s\n%s' % (index_entry.path, index_entry.hexsha[:self.hash_length])
+            label = '%s\n%s' % (index_entry.path, self.blob_hash(index_entry.path)[:self.hash_length])
         self.gv.node(label,
                      label=label,
                      color=self.type_colors[type].line_color,
@@ -190,15 +193,24 @@ class GitPlot(object):
                      penwidth='2',
                      )
 
+    def blob_hash(self, path):
+        full_path = os.path.join(self.repo.working_dir, path)
+        content = open(full_path, encoding='utf-8').read()
+        blob_content = 'blob %d\0%s' % (len(content), content)
+        hexsha = hashlib.sha1()
+        hexsha.update(blob_content.encode('utf-8'))
+        return hexsha.hexdigest()
+
     def add_untracked_file(self, untracked_file):
-        self.gv.node(untracked_file,
-                label=untracked_file,
+        label = '%s\n%s' % (untracked_file, self.blob_hash(untracked_file)[:self.hash_length])
+        self.gv.node(label,
+                label=label,
                 color=self.type_colors['untracked_file'].line_color,
                 style='filled',
                 fillcolor=self.type_colors['untracked_file'].fill_color,
                 penwidth='2',
                )
-        self.add_edge('Untracked', untracked_file)
+        self.add_edge('Untracked', label)
 
     def add_collapsed_commits(self, first_hexsha, last_hexsha, commits):
         label = '%s (%d) %s' % (last_hexsha[:self.hash_length],
