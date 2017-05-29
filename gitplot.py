@@ -407,13 +407,15 @@ class GitPlot(object):
         self.add_sym_ref('HEAD', self.repo.head.ref.path)
         self.add_edge('HEAD', self.repo.head.ref.path)
 
-        self.add_index()
-        for key in self.repo.index.entries:
-            self.add_index_entry(self.repo.index.entries[key])
+        if self.args.include_trees_blobs:
+            self.add_index()
+            for key in self.repo.index.entries:
+                self.add_index_entry(self.repo.index.entries[key])
 
-        self.add_untracked()
-        for untracked_file in self.repo.untracked_files:
-            self.add_untracked_file(untracked_file)
+        if len(self.repo.untracked_files):
+            self.add_untracked()
+            for untracked_file in self.repo.untracked_files:
+                self.add_untracked_file(untracked_file)
 
         output_filename = os.path.basename(self.repo.working_tree_dir)
         logging.info('Rendering graph %s...' % output_filename)
