@@ -196,7 +196,8 @@ class GitPlot(object):
 
     def blob_hash(self, path):
         full_path = os.path.join(self.repo.working_dir, path)
-        content = open(full_path, encoding='utf-8').read()
+        #content = open(full_path, encoding='utf-8').read()
+        content = open(full_path).read()
         blob_content = 'blob %d\0%s' % (len(content), content)
         hexsha = hashlib.sha1()
         hexsha.update(blob_content.encode('utf-8'))
@@ -262,8 +263,8 @@ class GitPlot(object):
             if git_obj.hexsha + parent.hexsha not in self.edges:
                 self.edges[git_obj.hexsha + parent.hexsha] = None
                 self.gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
-#        elif type(git_obj) in (str, unicode) and type(parent) in (str, unicode):
-        elif type(git_obj) == str and type(parent) == str:
+        elif type(git_obj) in (str, unicode) and type(parent) in (str, unicode):
+#        elif type(git_obj) == str and type(parent) == str:
             if git_obj + parent not in self.edges:
                 self.edges[git_obj + parent] = None
                 if git_obj == 'HEAD':
