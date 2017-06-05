@@ -164,13 +164,9 @@ class GitPlot(object):
         if index_entry.hexsha in self.all_blobs:
             if index_entry.path in [x.a_path for x in self.repo.index.diff(None)]:
                 type = 'changed_nonindex_entry'
-<<<<<<< HEAD
-                edges = ['Changed']
-                label = '%s\n%s' % (index_entry.path, self.blob_hash(index_entry.path)[:self.hash_length])
-=======
                 edges = ['Changed', 'Index']
+                label = '%s\n%s' % (index_entry.path, self.blob_hash(index_entry.path)[:self.hash_length])
                 # Make this color not changed yet?  Needs some work.
->>>>>>> Continuing work on index vs. working dir vs. modified...
             else:
                 type = 'blob'
                 edges = ['Index']
