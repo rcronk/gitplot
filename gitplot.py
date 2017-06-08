@@ -45,7 +45,7 @@ class GitPlot(object):
 #                            default=r'C:\ftl')
 #                            default=r'C:\Users\cronk\PycharmProjects\mutate')
                             default=r'.')
-        parser.add_argument('--include-trees-blobs', help='Include trees and blobs.', action='store_true', default=False)
+        parser.add_argument('--verbose', help='Include trees and blobs, index, etc.', action='store_true', default=False)
         parser.add_argument('--max-commit-depth', type=int, default=10)
         parser.add_argument('--output-format', type=str, default='svg')
         parser.add_argument('--rank-direction', type=str, default='RL')
@@ -95,7 +95,7 @@ class GitPlot(object):
                 fillcolor=self.type_colors[commit.type].fill_color,
                 penwidth='2',
                 )
-        if commit.type == 'commit' and self.args.include_trees_blobs:
+        if commit.type == 'commit' and self.args.verbose:
             self.add_tree(commit, commit.tree)
 
     def add_ellipsis(self, commit):
@@ -106,7 +106,7 @@ class GitPlot(object):
                 fillcolor=self.type_colors[commit.type].fill_color,
                 penwidth='2',
                )
-        if commit.type == 'commit' and self.args.include_trees_blobs:
+        if commit.type == 'commit' and self.args.verbose:
             self.add_tree(commit, commit.tree)
 
     def get_commit_details(self, commit):
@@ -127,7 +127,7 @@ class GitPlot(object):
                 penwidth='2',
                )
         self.add_edge(parent, tree)
-        if self.args.include_trees_blobs:
+        if self.args.verbose:
             for blob in tree.blobs:
                 self.add_blob(tree, blob)
         for child_tree in tree.trees:
@@ -163,31 +163,33 @@ class GitPlot(object):
     def add_index_entry(self, index_entry):
         if index_entry.hexsha in self.all_blobs:
             if index_entry.path in [x.a_path for x in self.repo.index.diff(None)]:
-                type = 'changed_nonindex_entry'
-                edges = ['Changed', 'Index']
+                # This is a tracked, modified file that HAS NOT been added to the index yet.
+                node_type = 'changed_nonindex_entry'
+                edges = ['Changed', 'Working directory']
                 label = '%s\n%s' % (index_entry.path, self.blob_hash(index_entry.path)[:self.hash_length])
-                # Make this color not changed yet?  Needs some work.
             else:
-                type = 'blob'
+                # This is a tracked, unmodified file.
+                node_type = 'blob'
                 edges = ['Index']
                 label = '%s\n%s' % (index_entry.path, index_entry.hexsha[:self.hash_length])
         else:
-            type = 'changed_index_entry'
+            # This is a tracked, modified file that HAS been added to the index.
+            node_type = 'changed_index_entry'
             edges = ['Changed', 'Index']
             label = '%s\n%s' % (index_entry.path, self.blob_hash(index_entry.path)[:self.hash_length])
         self.gv.node(label,
                      label=label,
-                     color=self.type_colors[type].line_color,
+                     color=self.type_colors[node_type].line_color,
                      style='filled',
-                     fillcolor=self.type_colors[type].fill_color,
+                     fillcolor=self.type_colors[node_type].fill_color,
                      penwidth='2',
                      )
         for edge in edges:
             self.add_edge(edge, label)
 
     def add_untracked(self):
-        self.gv.node('Untracked',
-                     label='Untracked',
+        self.gv.node('Working directory',
+                     label='Working directory',
                      color=self.type_colors['untracked_file'].line_color,
                      style='filled',
                      fillcolor=self.type_colors['untracked_file'].fill_color,
@@ -212,7 +214,7 @@ class GitPlot(object):
                 fillcolor=self.type_colors['untracked_file'].fill_color,
                 penwidth='2',
                )
-        self.add_edge('Untracked', label)
+        self.add_edge('Working directory', label)
 
     def add_collapsed_commits(self, first_hexsha, last_hexsha, commits):
         label = '%s (%d) %s' % (last_hexsha[:self.hash_length],
@@ -271,7 +273,7 @@ class GitPlot(object):
                     self.gv.edge(git_obj, parent, label='head')
                 elif git_obj == 'Index':
                     self.gv.edge(git_obj, parent, label='index')
-                elif git_obj == 'Untracked':
+                elif git_obj == 'Working directory':
                     self.gv.edge(git_obj, parent, label='untracked')
                 elif git_obj == 'Changed':
                     self.gv.edge(git_obj, parent, label='changed')
@@ -421,7 +423,7 @@ class GitPlot(object):
         self.add_sym_ref('HEAD', self.repo.head.ref.path)
         self.add_edge('HEAD', self.repo.head.ref.path)
 
-        if self.args.include_trees_blobs:
+        if self.args.verbose:
             self.add_index()
             for key in self.repo.index.entries:
                 self.add_index_entry(self.repo.index.entries[key])
