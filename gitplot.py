@@ -247,7 +247,7 @@ class GitPlot(object):
                )
 
     def add_edge(self, git_obj, parent):
-        if type(git_obj) in (git.Head, git.TagReference, git.RemoteReference):
+        if type(git_obj) in (git.Head, git.TagReference, git.RemoteReference, git.Reference):
             if git_obj.path + parent.hexsha not in self.edges:
                 self.edges[git_obj.path + parent.hexsha] = None
                 label = str(type(git_obj)).lower()
@@ -265,8 +265,8 @@ class GitPlot(object):
             if git_obj.hexsha + parent.hexsha not in self.edges:
                 self.edges[git_obj.hexsha + parent.hexsha] = None
                 self.gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
-        elif type(git_obj) in (str, unicode) and type(parent) in (str, unicode):
-#        elif type(git_obj) == str and type(parent) == str:
+#        elif type(git_obj) in (str, unicode) and type(parent) in (str, unicode):
+        elif type(git_obj) == str and type(parent) == str:
             if git_obj + parent not in self.edges:
                 self.edges[git_obj + parent] = None
                 if git_obj == 'HEAD':
@@ -312,7 +312,7 @@ class GitPlot(object):
             elif type(git_obj) == git.Commit:
                 logging.info('Scanning detected merge path from %s...', git_obj.hexsha)
                 obj = git_obj
-            elif type(git_obj) in (git.TagReference, git.RemoteReference):
+            elif type(git_obj) in (git.TagReference, git.RemoteReference, git.Reference):
                 logging.info('Scanning reference %s...', git_obj.path)
                 obj = git_obj.commit
             else:
@@ -356,7 +356,7 @@ class GitPlot(object):
                 logging.info('Processing detected merge path from %s...', git_obj.hexsha)
                 self.add_commit(git_obj)
                 obj = git_obj
-            elif type(git_obj) in (git.TagReference, git.RemoteReference):
+            elif type(git_obj) in (git.TagReference, git.RemoteReference, git.Reference):
                 logging.info('Processing reference %s...', git_obj.path)
                 self.add_head(git_obj)
                 self.add_edge(git_obj, git_obj.object)
@@ -433,7 +433,7 @@ class GitPlot(object):
             for untracked_file in self.repo.untracked_files:
                 self.add_untracked_file(untracked_file)
 
-        output_filename = os.path.basename(self.repo.working_tree_dir)
+        output_filename = os.path.basename(self.repo.working_tree_dir) + '.dot'
         logging.info('Rendering graph %s...' % output_filename)
         self.gv.render(filename=output_filename, view=True, cleanup=True)
         logging.info('Done.')
