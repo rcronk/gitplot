@@ -13,7 +13,7 @@ import hashlib
 import graphviz
 import git
 
-__version__ = '0.0.5'
+__version__ = '0.1.0'
 
 
 class GitPlot(object):
