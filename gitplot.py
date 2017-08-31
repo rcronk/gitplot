@@ -13,51 +13,67 @@ __version__ = '0.1.0'
 
 
 class GitPlot(object):
+    """ GitPlot main class. """
+
+    # pylint: disable=too-many-instance-attributes
+
     class Colors(object):
+        """ This holds the data for line and fill colors.
+        Perhaps a named tuple would be better? """
         def __init__(self, line_color, fill_color):
             self._line_color = line_color
             self._fill_color = fill_color
 
         @property
         def line_color(self):
+            """ Returns the line color. """
             return self._line_color
 
         @property
         def fill_color(self):
+            """ Returns the fill color. """
             return self._fill_color
 
     def __init__(self, arguments):
         """ Entry point for command line. """
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+        logging.basicConfig(level=logging.INFO,
+                            format='%(asctime)s %(message)s')
         logging.info('gitplot %s', __version__)
 
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path', help='Path to the git repo.',
-#                            default=r'C:\Users\24860\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-#                            default=r'D:\OneDrive\Personal\Documents\Robert\code\temprepo-jjymki0k')
-#                            default=r'C:\Users\24860\code\git\devtools')
-#                            default=r'C:\Users\24860\code\git\common')
-#                            default=r'C:\Users\24860\Documents\hti')
-#                            default=r'C:\ftl')
-#                            default=r'C:\Users\cronk\PycharmProjects\mutate')
+                            # default=r'C:\Users\24860\OneDrive\...\code\temprepo-jjymki0k')
+                            # default=r'D:\OneDrive\Personal\Documents\...\code\temprepo-jjymki0k')
+                            # default=r'C:\Users\24860\code\git\devtools')
+                            # default=r'C:\Users\24860\code\git\common')
+                            # default=r'C:\Users\24860\Documents\hti')
+                            # default=r'C:\ftl')
+                            # default=r'C:\Users\cronk\PycharmProjects\mutate')
                             default=r'.')
-        parser.add_argument('--verbose', help='Include trees and blobs, index, etc.', action='store_true', default=False)
+        parser.add_argument('--verbose', help='Include trees and blobs, etc.',
+                            action='store_true', default=False)
         parser.add_argument('--max-commit-depth', type=int, default=10)
         parser.add_argument('--output-format', type=str, default='svg')
         parser.add_argument('--rank-direction', type=str, default='RL')
-        parser.add_argument('--collapse-commits', action="store_true", default=False)
-        parser.add_argument('--exclude-remotes', action="store_true", default=False)
+        parser.add_argument('--collapse-commits', action="store_true",
+                            default=False)
+        parser.add_argument('--exclude-remotes', action="store_true",
+                            default=False)
         parser.add_argument('--head-only', action="store_true", default=False)
-        parser.add_argument('--branch-diagram', action="store_true", default=False)
-        parser.add_argument('--commit-details', action="store_true", default=False)
+        parser.add_argument('--branch-diagram', action="store_true",
+                            default=False)
+        parser.add_argument('--commit-details', action="store_true",
+                            default=False)
         self.args = parser.parse_args(arguments)
 
         logging.info('args: %s', self.args)
 
         # parse stuff and store in self.*
 
-        self.gv = graphviz.Digraph(format=self.args.output_format, engine='dot')
-        self.gv.graph_attr['rankdir'] = self.args.rank_direction  # Right to left (which makes the first commit appear on the far left)
+        self.grv = graphviz.Digraph(format=self.args.output_format,
+                                    engine='dot')
+        # Right to left (which makes the first commit appear on the far left)
+        self.grv.graph_attr['rankdir'] = self.args.rank_direction
 
         self.repo = git.Repo(self.args.repo_path)
 
@@ -68,8 +84,9 @@ class GitPlot(object):
         self.all_blobs = {}
 
         self.type_colors = {}
-        object_types = ['ref', 'tag', 'commit', 'commit_summary', 'tree', 'blob', 'changed_index_entry',
-                        'changed_nonindex_entry', 'untracked_file']
+        object_types = ['ref', 'tag', 'commit', 'commit_summary', 'tree',
+                        'blob', 'changed_index',
+                        'changed_nonindex', 'untracked_file']
         hue_step = 1.0 / len(object_types)
         hue = 0.000
         for object_type in object_types:
@@ -81,31 +98,35 @@ class GitPlot(object):
         self.hash_length = 5  # Will be adjusted later
 
     def add_commit(self, commit):
+        """ Add a commit to the tree. """
         label = commit.hexsha[:self.hash_length]
         if commit.type == 'commit' and self.args.commit_details:
             label += '\n' + self.get_commit_details(commit)
-        self.gv.node(commit.hexsha,
-                label=label,
-                color=self.type_colors[commit.type].line_color,
-                style='filled',
-                fillcolor=self.type_colors[commit.type].fill_color,
-                penwidth='2',
-                )
+        self.grv.node(commit.hexsha,
+                      label=label,
+                      color=self.type_colors[commit.type].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors[commit.type].fill_color,
+                      penwidth='2',
+                     )
         if commit.type == 'commit' and self.args.verbose:
             self.add_tree(commit, commit.tree)
 
     def add_ellipsis(self, commit):
-        self.gv.node(commit.hexsha,
-                label='...',
-                color=self.type_colors[commit.type].line_color,
-                style='filled',
-                fillcolor=self.type_colors[commit.type].fill_color,
-                penwidth='2',
-               )
+        """ Add an ellipsis to the tree. """
+        self.grv.node(commit.hexsha,
+                      label='...',
+                      color=self.type_colors[commit.type].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors[commit.type].fill_color,
+                      penwidth='2',
+                     )
         if commit.type == 'commit' and self.args.verbose:
             self.add_tree(commit, commit.tree)
 
-    def get_commit_details(self, commit):
+    @staticmethod
+    def get_commit_details(commit):
+        """ Returns the commit details for a given commit. """
         if len(commit.message) > 40:
             message = commit.message[:40] + '...'
         else:
@@ -115,13 +136,14 @@ class GitPlot(object):
                           commit.authored_datetime.isoformat()])
 
     def add_tree(self, parent, tree):
-        self.gv.node(tree.hexsha,
-                label=tree.hexsha[:self.hash_length],
-                color=self.type_colors[tree.type].line_color,
-                style='filled',
-                fillcolor=self.type_colors[tree.type].fill_color,
-                penwidth='2',
-               )
+        """ This adds a tree (directory) to the tree. """
+        self.grv.node(tree.hexsha,
+                      label=tree.hexsha[:self.hash_length],
+                      color=self.type_colors[tree.type].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors[tree.type].fill_color,
+                      penwidth='2',
+                     )
         self.add_edge(parent, tree)
         if self.args.verbose:
             for blob in tree.blobs:
@@ -130,71 +152,81 @@ class GitPlot(object):
             self.add_tree(tree, child_tree)
 
     def add_blob(self, tree, blob):
+        """ This adds a blob to the tree. """
         self.all_blobs[blob.hexsha] = None
-        self.gv.node(blob.hexsha,
-                     label=blob.hexsha[:self.hash_length],
-                     color=self.type_colors[blob.type].line_color,
-                     style='filled',
-                     fillcolor=self.type_colors[blob.type].fill_color,
-                     penwidth='2',
+        self.grv.node(blob.hexsha,
+                      label=blob.hexsha[:self.hash_length],
+                      color=self.type_colors[blob.type].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors[blob.type].fill_color,
+                      penwidth='2',
                      )
         self.add_edge(tree, blob)
 
     def add_index(self):
-        self.gv.node('Index',
-                     label='Index',
-                     color=self.type_colors['blob'].line_color,
-                     style='filled',
-                     fillcolor=self.type_colors['blob'].fill_color,
-                     penwidth='2',
+        """ This adds the index to the tree. """
+        self.grv.node('Index',
+                      label='Index',
+                      color=self.type_colors['blob'].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors['blob'].fill_color,
+                      penwidth='2',
                      )
-        self.gv.node('Changed',
-                     label='Changed',
-                     color=self.type_colors['changed_nonindex_entry'].line_color,
-                     style='filled',
-                     fillcolor=self.type_colors['changed_nonindex_entry'].fill_color,
-                     penwidth='2',
+        self.grv.node('Changed',
+                      label='Changed',
+                      color=self.type_colors['changed_nonindex'].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors['changed_nonindex'].fill_color,
+                      penwidth='2',
                      )
 
     def add_index_entry(self, index_entry):
+        """ This adds an index entry to the tree. """
         if index_entry.hexsha in self.all_blobs:
-            if index_entry.path in [x.a_path for x in self.repo.index.diff(None)]:
-                # This is a tracked, modified file that HAS NOT been added to the index yet.
-                node_type = 'changed_nonindex_entry'
+            index_entry_paths = [x.a_path for x in self.repo.index.diff(None)]
+            if index_entry.path in index_entry_paths:
+                # This is a tracked, modified file that HAS NOT been added to
+                # the index yet.
+                node_type = 'changed_nonindex'
                 edges = ['Changed', 'Working directory']
-                label = '%s\n%s' % (index_entry.path, self.blob_hash(index_entry.path)[:self.hash_length])
+                hash = self.blob_hash(index_entry.path)[:self.hash_length]
+                label = '%s\n%s' % (index_entry.path, hash)
             else:
                 # This is a tracked, unmodified file.
                 node_type = 'blob'
                 edges = ['Index']
-                label = '%s\n%s' % (index_entry.path, index_entry.hexsha[:self.hash_length])
+                hash = index_entry.hexsha[:self.hash_length]
+                label = '%s\n%s' % (index_entry.path, hash)
         else:
-            # This is a tracked, modified file that HAS been added to the index.
-            node_type = 'changed_index_entry'
+            # This is a tracked, modified file that HAS been added to the index
+            node_type = 'changed_index'
             edges = ['Changed', 'Index']
-            label = '%s\n%s' % (index_entry.path, self.blob_hash(index_entry.path)[:self.hash_length])
-        self.gv.node(label,
-                     label=label,
-                     color=self.type_colors[node_type].line_color,
-                     style='filled',
-                     fillcolor=self.type_colors[node_type].fill_color,
-                     penwidth='2',
+            hash = self.blob_hash(index_entry.path)[:self.hash_length]
+            label = '%s\n%s' % (index_entry.path, hash)
+        self.grv.node(label,
+                      label=label,
+                      color=self.type_colors[node_type].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors[node_type].fill_color,
+                      penwidth='2',
                      )
         for edge in edges:
             self.add_edge(edge, label)
 
     def add_untracked(self):
-        self.gv.node('Working directory',
-                     label='Working directory',
-                     color=self.type_colors['untracked_file'].line_color,
-                     style='filled',
-                     fillcolor=self.type_colors['untracked_file'].fill_color,
-                     penwidth='2',
+        """ This adds untracked to the tree. """
+        self.grv.node('Working directory',
+                      label='Working directory',
+                      color=self.type_colors['untracked_file'].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors['untracked_file'].fill_color,
+                      penwidth='2',
                      )
 
     def blob_hash(self, path):
+        """ This calculates and returns the blob hash for a file. """
         full_path = os.path.join(self.repo.working_dir, path)
-        #content = open(full_path, encoding='utf-8').read()
+        # content = open(full_path, encoding='utf-8').read()
         content = open(full_path).read()
         blob_content = 'blob %d\0%s' % (len(content), content)
         hexsha = hashlib.sha1()
@@ -202,76 +234,80 @@ class GitPlot(object):
         return hexsha.hexdigest()
 
     def add_untracked_file(self, untracked_file):
-        label = '%s\n%s' % (untracked_file, self.blob_hash(untracked_file)[:self.hash_length])
-        self.gv.node(label,
-                label=label,
-                color=self.type_colors['untracked_file'].line_color,
-                style='filled',
-                fillcolor=self.type_colors['untracked_file'].fill_color,
-                penwidth='2',
-               )
+        hash = self.blob_hash(untracked_file)[:self.hash_length]
+        label = '%s\n%s' % (untracked_file, hash)
+        self.grv.node(label,
+                      label=label,
+                      color=self.type_colors['untracked_file'].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors['untracked_file'].fill_color,
+                      penwidth='2',
+                     )
         self.add_edge('Working directory', label)
 
-    def add_collapsed_commits(self, first_hexsha, last_hexsha, commits):
+    def add_collapse_commits(self, first_hexsha, last_hexsha, commits):
         label = '%s (%d) %s' % (last_hexsha[:self.hash_length],
                                 commits,
                                 first_hexsha[:self.hash_length])
-        self.gv.node(first_hexsha,
-                label=label,
-                color=self.type_colors['commit_summary'].line_color,
-                style='filled',
-                fillcolor=self.type_colors['commit_summary'].fill_color,
-                penwidth='2',
-               )
+        self.grv.node(first_hexsha,
+                      label=label,
+                      color=self.type_colors['commit_summary'].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors['commit_summary'].fill_color,
+                      penwidth='2',
+                     )
 
     def add_head(self, head):
-        self.gv.node(head.path,
-                label=head.path,
-                color=self.type_colors['ref'].line_color,
-                style='filled',
-                fillcolor=self.type_colors['ref'].fill_color,
-                penwidth='2',
-               )
+        self.grv.node(head.path,
+                      label=head.path,
+                      color=self.type_colors['ref'].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors['ref'].fill_color,
+                      penwidth='2',
+                     )
 
     def add_sym_ref(self, name, parent):
-        self.gv.node(name,
-                label=name,
-                color=self.type_colors['ref'].line_color,
-                style='filled',
-                fillcolor=self.type_colors['ref'].fill_color,
-                penwidth='2',
-               )
+        self.grv.node(name,
+                      label=name,
+                      color=self.type_colors['ref'].line_color,
+                      style='filled',
+                      fillcolor=self.type_colors['ref'].fill_color,
+                      penwidth='2',
+                     )
 
     def add_edge(self, git_obj, parent):
-        if type(git_obj) in (git.Head, git.TagReference, git.RemoteReference, git.Reference):
+        refs = (git.Head, git.TagReference, git.RemoteReference, git.Reference)
+        if type(git_obj) in refs:
             if git_obj.path + parent.hexsha not in self.edges:
                 self.edges[git_obj.path + parent.hexsha] = None
                 label = str(type(git_obj)).lower()
                 label = label.split('.')[-1][:-2]
-                self.gv.edge(git_obj.path, parent.hexsha, label=label)
-        elif type(git_obj) in (git.Commit, git.TagObject) and type(parent) in (git.Commit, git.TagObject):
+                self.grv.edge(git_obj.path, parent.hexsha, label=label)
+        elif type(git_obj) in (git.Commit, git.TagObject) \
+                and type(parent) in (git.Commit, git.TagObject):
             if git_obj.hexsha + parent.hexsha not in self.edges:
                 self.edges[git_obj.hexsha + parent.hexsha] = None
-                self.gv.edge(git_obj.hexsha, parent.hexsha, label='parent')
-        elif type(git_obj) in (git.Commit, git.TagObject) and type(parent) in (git.Tree, ):
+                self.grv.edge(git_obj.hexsha, parent.hexsha, label='parent')
+        elif type(git_obj) in (git.Commit, git.TagObject) \
+                and type(parent) in (git.Tree, ):
             if git_obj.hexsha + parent.hexsha not in self.edges:
                 self.edges[git_obj.hexsha + parent.hexsha] = None
-                self.gv.edge(git_obj.hexsha, parent.hexsha, label='tree')
+                self.grv.edge(git_obj.hexsha, parent.hexsha, label='tree')
         elif type(git_obj) in (git.Tree, ):
             if git_obj.hexsha + parent.hexsha not in self.edges:
                 self.edges[git_obj.hexsha + parent.hexsha] = None
-                self.gv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
+                self.grv.edge(git_obj.hexsha, parent.hexsha, label=parent.name)
         elif type(git_obj) == str and type(parent) == str:
             if git_obj + parent not in self.edges:
                 self.edges[git_obj + parent] = None
                 if git_obj == 'HEAD':
-                    self.gv.edge(git_obj, parent, label='head')
+                    self.grv.edge(git_obj, parent, label='head')
                 elif git_obj == 'Index':
-                    self.gv.edge(git_obj, parent, label='index')
+                    self.grv.edge(git_obj, parent, label='index')
                 elif git_obj == 'Working directory':
-                    self.gv.edge(git_obj, parent, label='untracked')
+                    self.grv.edge(git_obj, parent, label='untracked')
                 elif git_obj == 'Changed':
-                    self.gv.edge(git_obj, parent, label='changed')
+                    self.grv.edge(git_obj, parent, label='changed')
                 else:
                     raise Exception('Unknown object type: %s' % git_obj)
         else:
@@ -279,9 +315,12 @@ class GitPlot(object):
 
     def boring(self, commit):
         parents = len(commit.parents)
-        num_refs = len([x for x in commit.repo.refs if type(x) in (git.Head, git.RemoteReference) and x.object.hexsha == commit.hexsha])
+        num_refs = len([x for x in commit.repo.refs
+                        if type(x) in (git.Head, git.RemoteReference) and
+                        x.object.hexsha == commit.hexsha])
         if self.args.branch_diagram:  # This doesn't work yet.
-            branch_points = [x.hexsha for x in self.all_children if len(self.all_children[x]) > 1]
+            branch_points = [x.hexsha for x in self.all_children
+                             if len(self.all_children[x]) > 1]
             branch_point = commit.hexsha in branch_points
             return parents == 1 and num_refs == 0 and not branch_point
         else:
@@ -294,28 +333,33 @@ class GitPlot(object):
     def pre_scan(self):
         logging.info('Pre-scanning the tree...')
         if self.args.head_only:
-            self.refs = [x for x in self.repo.refs if x.path == self.repo.head.ref.path]
+            self.refs = [x for x in self.repo.refs
+                         if x.path == self.repo.head.ref.path]
         elif not self.args.exclude_remotes:
             self.refs = self.repo.refs
         else:
-            self.refs = [x for x in self.repo.refs if 'remote' not in x.path]
+            self.refs = [x for x in self.repo.refs
+                         if 'remote' not in x.path]
 
+        refs = (git.TagReference, git.RemoteReference, git.Reference)
         for git_obj in self.refs:
             if type(git_obj) == git.Head:
                 logging.info('Scanning head %s...', git_obj.path)
                 obj = git_obj.object
             elif type(git_obj) == git.Commit:
-                logging.info('Scanning detected merge path from %s...', git_obj.hexsha)
+                logging.info('Scanning detected merge path from %s...',
+                             git_obj.hexsha)
                 obj = git_obj
-            elif type(git_obj) in (git.TagReference, git.RemoteReference, git.Reference):
+            elif type(git_obj) in refs:
                 logging.info('Scanning reference %s...', git_obj.path)
                 obj = git_obj.commit
             else:
                 raise Exception('unknown type: %s' % type(git_obj))
             while obj.parents:
                 for parent in obj.parents[1:]:
-                    if parent.hexsha not in [x.hexsha for x in self.refs if type(x) == git.Commit]:
-                        self.refs.append(parent)  # Follow these other paths later
+                    if parent.hexsha not in [x.hexsha for x in self.refs
+                                             if type(x) == git.Commit]:
+                        self.refs.append(parent)  # Follow these paths later
                         if parent in self.all_children:
                             if obj not in self.all_children[parent]:
                                 self.all_children[parent] += [obj]
@@ -328,11 +372,11 @@ class GitPlot(object):
                     self.all_children[obj.parents[0]] = [obj]
                 obj = obj.parents[0]
 
-
-        # Calculate the length of the short hash based on the total number of objects
+        # Calculate length of the short hash based on the total # of objects
         num_objects = len(self.all_children)
         if num_objects:
-            self.hash_length = max(5, int(math.ceil(math.log(num_objects) * math.log(math.e, 2) / 2)))
+            self.hash_length = max(5, int(math.ceil(math.log(num_objects) *
+                                                    math.log(math.e, 2) / 2)))
 
         logging.info('Pre-scan finished.')
         logging.info('%d objects found.', num_objects)
@@ -341,6 +385,7 @@ class GitPlot(object):
     def draw_graph(self):
         # Final pass, build the graph
         logging.info('Creating tree diagram...')
+        refs = (git.TagReference, git.RemoteReference, git.Reference)
         for git_obj in self.refs:
             if type(git_obj) == git.Head:
                 logging.info('Processing head %s...', git_obj.path)
@@ -348,10 +393,11 @@ class GitPlot(object):
                 self.add_edge(git_obj, git_obj.object)
                 obj = git_obj.object
             elif type(git_obj) == git.Commit:
-                logging.info('Processing detected merge path from %s...', git_obj.hexsha)
+                logging.info('Processing detected merge path from %s...',
+                             git_obj.hexsha)
                 self.add_commit(git_obj)
                 obj = git_obj
-            elif type(git_obj) in (git.TagReference, git.RemoteReference, git.Reference):
+            elif type(git_obj) in refs:
                 logging.info('Processing reference %s...', git_obj.path)
                 self.add_head(git_obj)
                 self.add_edge(git_obj, git_obj.object)
@@ -371,10 +417,10 @@ class GitPlot(object):
                 depth += 1
                 if depth > self.args.max_commit_depth:
                     if self.args.collapse_commits and collapsing:
-                        self.add_collapsed_commits(first_collapsed_commit.hexsha,
-                                              last_collapsed_commit.hexsha,
-                                              collapsed_commits)
-                        self.add_edge(first_collapsed_commit, obj)
+                        self.add_collapse_commits(first_collapse_commit.hexsha,
+                                                  last_collapsed_commit.hexsha,
+                                                  collapsed_commits)
+                        self.add_edge(first_collapse_commit, obj)
                     self.add_ellipsis(obj)
                     obj = None
                 else:
@@ -384,13 +430,14 @@ class GitPlot(object):
                             collapsed_commits += 1
                         else:
                             if collapsed_commits == 1:
-                                self.add_commit(first_collapsed_commit)
-                                self.add_edge(first_collapsed_commit, obj)
+                                self.add_commit(first_collapse_commit)
+                                self.add_edge(first_collapse_commit, obj)
                             else:
-                                self.add_collapsed_commits(first_collapsed_commit.hexsha,
-                                                      last_collapsed_commit.hexsha,
-                                                      collapsed_commits)
-                                self.add_edge(first_collapsed_commit, obj)
+                                self.add_collapse_commits(
+                                    first_collapse_commit.hexsha,
+                                    last_collapsed_commit.hexsha,
+                                    collapsed_commits)
+                                self.add_edge(first_collapse_commit, obj)
                                 # Now add this non-boring commit
                             self.add_commit(obj)
                             if obj.parents:
@@ -402,7 +449,7 @@ class GitPlot(object):
                     else:
                         if self.args.collapse_commits and self.boring(obj):
                             collapsing = True
-                            first_collapsed_commit = obj
+                            first_collapse_commit = obj
                             collapsed_commits = 1
                         else:
                             self.add_commit(obj)
@@ -430,7 +477,7 @@ class GitPlot(object):
 
         output_filename = os.path.basename(self.repo.working_tree_dir) + '.dot'
         logging.info('Rendering graph %s...' % output_filename)
-        self.gv.render(filename=output_filename, view=True, cleanup=True)
+        self.grv.render(filename=output_filename, view=True, cleanup=True)
         logging.info('Done.')
 
     def create_graph(self):
