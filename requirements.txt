@@ -1,5 +1,4 @@
 graphviz
 gitpython
-future
 pylint
 pep8
