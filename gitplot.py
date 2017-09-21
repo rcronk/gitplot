@@ -469,7 +469,7 @@ class GitPlot(object):
         self.add_head('HEAD')
         self.add_edge('HEAD', self.repo.head.ref.path)
 
-        if self.args.verbose:
+        if self.repo.index.entries:
             self.add_index()
             for key in self.repo.index.entries:
                 self.add_index_entry(self.repo.index.entries[key])
