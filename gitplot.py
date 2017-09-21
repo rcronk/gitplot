@@ -165,15 +165,15 @@ class GitPlot(object):
 
     def add_index(self):
         """ This adds the index to the tree. """
-        self.grv.node('Index',
-                      label='Index',
+        self.grv.node('Staged Changes',
+                      label='Staged Changes',
                       color=self.type_colors['blob'].line_color,
                       style='filled',
                       fillcolor=self.type_colors['blob'].fill_color,
                       penwidth='2',
                      )
-        self.grv.node('Changed',
-                      label='Changed',
+        self.grv.node('Unstaged Changes',
+                      label='Unstaged Changes',
                       color=self.type_colors['changed_nonindex'].line_color,
                       style='filled',
                       fillcolor=self.type_colors['changed_nonindex'].fill_color,
@@ -182,41 +182,42 @@ class GitPlot(object):
 
     def add_index_entry(self, index_entry):
         """ This adds an index entry to the tree. """
-        if index_entry.hexsha in self.all_blobs:
-            index_entry_paths = [x.a_path for x in self.repo.index.diff(None)]
-            if index_entry.path in index_entry_paths:
-                # This is a tracked, modified file that HAS NOT been added to
-                # the index yet.
-                node_type = 'changed_nonindex'
-                edges = ['Changed', 'Working directory']
-                bhash = self.blob_hash(index_entry.path)[:self.hash_length]
-                label = '%s\n%s' % (index_entry.path, bhash)
-            else:
-                # This is a tracked, unmodified file.
-                node_type = 'blob'
-                edges = ['Index']
-                bhash = index_entry.hexsha[:self.hash_length]
-                label = '%s\n%s' % (index_entry.path, bhash)
-        else:
-            # This is a tracked, modified file that HAS been added to the index
-            node_type = 'changed_index'
-            edges = ['Changed', 'Index']
+        index_matches_content_in_repo = index_entry.hexsha in self.all_blobs
+        changes_between_index_and_workspace = [x.a_path for x in self.repo.index.diff(None)]
+        changes_between_index_and_repo = [x.a_path for x in self.repo.index.diff(self.repo.head.commit)]
+        unstaged_change = index_entry.path in changes_between_index_and_workspace
+        staged_change = index_entry.path in changes_between_index_and_repo
+        edges = []
+
+        if unstaged_change:
+            # This is a modified file whose changes have NOT been added to the index yet.
+            node_type = 'changed_nonindex'
+            edges.append('Unstaged Changes')
             bhash = self.blob_hash(index_entry.path)[:self.hash_length]
             label = '%s\n%s' % (index_entry.path, bhash)
-        self.grv.node(label,
-                      label=label,
-                      color=self.type_colors[node_type].line_color,
-                      style='filled',
-                      fillcolor=self.type_colors[node_type].fill_color,
-                      penwidth='2',
-                     )
-        for edge in edges:
-            self.add_edge(edge, label)
+
+        if staged_change:
+            # This is a modified file that HAS been added to the index
+            node_type = 'changed_index'
+            edges.append('Staged Changes')
+            bhash = self.blob_hash(index_entry.path)[:self.hash_length]
+            label = '%s\n%s' % (index_entry.path, bhash)
+
+        if staged_change or unstaged_change:
+            self.grv.node(label,
+                          label=label,
+                          color=self.type_colors[node_type].line_color,
+                          style='filled',
+                          fillcolor=self.type_colors[node_type].fill_color,
+                          penwidth='2',
+                         )
+            for edge in edges:
+                self.add_edge(edge, label)
 
     def add_untracked(self):
         """ This adds untracked to the tree. """
-        self.grv.node('Working directory',
-                      label='Working directory',
+        self.grv.node('Untracked',
+                      label='Untracked',
                       color=self.type_colors['untracked_file'].line_color,
                       style='filled',
                       fillcolor=self.type_colors['untracked_file'].fill_color,
@@ -244,7 +245,7 @@ class GitPlot(object):
                       fillcolor=self.type_colors['untracked_file'].fill_color,
                       penwidth='2',
                      )
-        self.add_edge('Working directory', label)
+        self.add_edge('Untracked', label)
 
     def add_collapse_commits(self, first_hexsha, last_hexsha, commits):
         """ Add a collapsed commits node to the graph. """
