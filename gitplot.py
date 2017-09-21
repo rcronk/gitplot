@@ -85,8 +85,8 @@ class GitPlot(object):
 
         self.type_colors = {}
         object_types = ['ref', 'tag', 'commit', 'commit_summary', 'tree',
-                        'blob', 'changed_index',
-                        'changed_nonindex', 'untracked_file']
+                        'blob', 'staged_changes',
+                        'unstaged_changes', 'untracked_file']
         hue_step = 1.0 / len(object_types)
         hue = 0.000
         for object_type in object_types:
@@ -167,43 +167,33 @@ class GitPlot(object):
         """ This adds the index to the tree. """
         self.grv.node('Staged Changes',
                       label='Staged Changes',
-                      color=self.type_colors['blob'].line_color,
+                      color=self.type_colors['staged_changes'].line_color,
                       style='filled',
-                      fillcolor=self.type_colors['blob'].fill_color,
+                      fillcolor=self.type_colors['staged_changes'].fill_color,
                       penwidth='2',
                      )
         self.grv.node('Unstaged Changes',
                       label='Unstaged Changes',
-                      color=self.type_colors['changed_nonindex'].line_color,
+                      color=self.type_colors['unstaged_changes'].line_color,
                       style='filled',
-                      fillcolor=self.type_colors['changed_nonindex'].fill_color,
+                      fillcolor=self.type_colors['unstaged_changes'].fill_color,
                       penwidth='2',
                      )
 
     def add_index_entry(self, index_entry):
         """ This adds an index entry to the tree. """
-        index_matches_content_in_repo = index_entry.hexsha in self.all_blobs
-        changes_between_index_and_workspace = [x.a_path for x in self.repo.index.diff(None)]
-        changes_between_index_and_repo = [x.a_path for x in self.repo.index.diff(self.repo.head.commit)]
-        unstaged_change = index_entry.path in changes_between_index_and_workspace
-        staged_change = index_entry.path in changes_between_index_and_repo
-        edges = []
+        # index_matches_content_in_repo = index_entry.hexsha in self.all_blobs
+        index_to_workspace_delta = [x.a_path for x in self.repo.index.diff(None)]
+        index_to_repo_delta = [x.a_path for x in self.repo.index.diff(self.repo.head.commit)]
+        unstaged_change = index_entry.path in index_to_workspace_delta
+        staged_change = index_entry.path in index_to_repo_delta
 
         if unstaged_change:
             # This is a modified file whose changes have NOT been added to the index yet.
-            node_type = 'changed_nonindex'
-            edges.append('Unstaged Changes')
+            node_type = 'unstaged_changes'
+            edge = 'Unstaged Changes'
             bhash = self.blob_hash(index_entry.path)[:self.hash_length]
             label = '%s\n%s' % (index_entry.path, bhash)
-
-        if staged_change:
-            # This is a modified file that HAS been added to the index
-            node_type = 'changed_index'
-            edges.append('Staged Changes')
-            bhash = self.blob_hash(index_entry.path)[:self.hash_length]
-            label = '%s\n%s' % (index_entry.path, bhash)
-
-        if staged_change or unstaged_change:
             self.grv.node(label,
                           label=label,
                           color=self.type_colors[node_type].line_color,
@@ -211,8 +201,22 @@ class GitPlot(object):
                           fillcolor=self.type_colors[node_type].fill_color,
                           penwidth='2',
                          )
-            for edge in edges:
-                self.add_edge(edge, label)
+            self.add_edge(edge, label)
+
+        if staged_change:
+            # This is a modified file whose changes HAVE been added to the index
+            node_type = 'staged_changes'
+            edge = 'Staged Changes'
+            bhash = index_entry.hexsha[:self.hash_length]
+            label = '%s\n%s' % (index_entry.path, bhash)
+            self.grv.node(label,
+                          label=label,
+                          color=self.type_colors[node_type].line_color,
+                          style='filled',
+                          fillcolor=self.type_colors[node_type].fill_color,
+                          penwidth='2',
+                         )
+            self.add_edge(edge, label)
 
     def add_untracked(self):
         """ This adds untracked to the tree. """
