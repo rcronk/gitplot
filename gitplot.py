@@ -186,8 +186,16 @@ class GitPlot(object):
         index_to_workspace_delta = [x.a_path for x in self.repo.index.diff(None)]
         try:
             index_to_repo_delta = [x.a_path for x in self.repo.index.diff(self.repo.head.commit)]
-        except ValueError:
-            index_to_repo_delta = []
+        except ValueError as error:
+            if error.args[0] == "Reference at 'refs/heads/master' does not exist":
+                # The repo is empty, and HEAD is pointing to /refs/heads/master and that ref doesn't exist until
+                # the first commit exists so the ref can point to something.  We'll therefore just take all the
+                # entries in the index as the diff between the index and the repo.  This only happens on an empty
+                # repo.
+                index_to_repo_delta = [x[0] for x in self.repo.index.entries]
+            else:
+                # Some unknown error occurred
+                raise
         unstaged_change = index_entry.path in index_to_workspace_delta
         staged_change = index_entry.path in index_to_repo_delta
         #if not unstaged_change and not staged_change:
@@ -432,11 +440,12 @@ class GitPlot(object):
             while obj:
                 depth += 1
                 if depth > self.args.max_commit_depth:
-                    if self.args.collapse_commits and collapsing:
-                        self.add_collapse_commits(first_collapse_commit.hexsha,
-                                                  last_collapse_commit.hexsha,
-                                                  collapsed_commits)
-                        self.add_edge(first_collapse_commit, obj)
+                    if first_collapse_commit and last_collapse_commit:
+                        if self.args.collapse_commits and collapsing:
+                            self.add_collapse_commits(first_collapse_commit.hexsha,
+                                                      last_collapse_commit.hexsha,
+                                                      collapsed_commits)
+                            self.add_edge(first_collapse_commit, obj)
                     self.add_ellipsis(obj)
                     obj = None
                 else:
