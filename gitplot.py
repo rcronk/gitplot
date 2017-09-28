@@ -198,11 +198,6 @@ class GitPlot(object):
                 raise
         unstaged_change = index_entry.path in index_to_workspace_delta
         staged_change = index_entry.path in index_to_repo_delta
-        #if not unstaged_change and not staged_change:
-        #    if index_entry.path in [x[0] for x in self.repo.index.entries]:
-        #        staged_change = True
-        #    else:
-        #        pass
 
         if unstaged_change:
             # This is a modified file whose changes have NOT been added to the index yet.
