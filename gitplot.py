@@ -194,7 +194,7 @@ class GitPlot(object):
                 # repo.
                 index_to_repo_delta = [x[0] for x in self.repo.index.entries]
             else:
-                # Some unknown error occurred
+                # Some unknown ValueError occurred
                 raise
         unstaged_change = index_entry.path in index_to_workspace_delta
         staged_change = index_entry.path in index_to_repo_delta
