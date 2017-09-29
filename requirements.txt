@@ -2,3 +2,4 @@ graphviz
 gitpython
 pylint
 pep8
+watchdog

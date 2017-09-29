@@ -1,13 +1,16 @@
 """ GitPlot - The git plotter. """
+import inspect
 import sys
 import os
 import math
 import logging
 import argparse
 import hashlib
+import time
 
 import graphviz
 import git
+import watchdog
 
 __version__ = '0.1.0'
 
@@ -64,6 +67,8 @@ class GitPlot(object):
                             default=False)
         parser.add_argument('--commit-details', action="store_true",
                             default=False)
+        parser.add_argument('--monitor', action="store_true",
+                            default=False)
         self.args = parser.parse_args(arguments)
 
         logging.info('args: %s', self.args)
@@ -96,6 +101,16 @@ class GitPlot(object):
             hue += hue_step
 
         self.hash_length = 5  # Will be adjusted later
+
+    @property
+    def monitoring(self):
+        return self.args.monitor
+
+    def wait_for_changes(self):
+        # Loop waiting for a change to the repo directory
+        # time.sleep(5)
+        # Use watchdog here
+        raise NotImplementedError(inspect.currentframe().f_code.co_name)
 
     def add_commit(self, commit):
         """ Add a commit to the tree. """
@@ -510,6 +525,12 @@ def main(arguments):
     """ This is the main entry point. """
     git_plot = GitPlot(arguments)
     git_plot.create_graph()
+
+    if git_plot.monitoring:
+        while True:
+            git_plot.wait_for_changes()
+            git_plot.create_graph()
+
 
 
 if __name__ == "__main__":
