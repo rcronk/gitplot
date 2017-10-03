@@ -13,7 +13,7 @@ import git
 import watchdog
 
 __version__ = '0.1.0'
-
+dir_changed = False
 
 class GitPlot(object):
     """ GitPlot main class. """
@@ -106,11 +106,37 @@ class GitPlot(object):
     def monitoring(self):
         return self.args.monitor
 
+    class GitPlotEventHandler(watchdog.events.FileSystemEventHandler):
+        def catch_all_handler(self, event):
+            global dir_changed
+            dir_changed = True
+
+        def on_moved(self, event):
+            self.catch_all_handler(event)
+
+        def on_created(self, event):
+            self.catch_all_handler(event)
+
+        def on_deleted(self, event):
+            self.catch_all_handler(event)
+
+        def on_modified(self, event):
+            self.catch_all_handler(event)
+
     def wait_for_changes(self):
-        # Loop waiting for a change to the repo directory
-        # time.sleep(5)
-        # Use watchdog here
-        raise NotImplementedError(inspect.currentframe().f_code.co_name)
+        global dir_changed
+
+        dir_changed = False
+        event_handler = self.GitPlotEventHandler()
+        observer = watchdog.observers.Observer()
+        observer.schedule(event_handler, self.args.repo_path, recursive=True)
+        observer.start()
+        try:
+            while not dir_changed:
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            observer.stop()
+        observer.join()
 
     def add_commit(self, commit):
         """ Add a commit to the tree. """
