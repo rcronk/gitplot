@@ -110,6 +110,7 @@ class GitPlot(object):
     class GitPlotEventHandler(FileSystemEventHandler):
         def catch_all_handler(self, event):
             global dir_changed
+            logging.info('Change detected...')
             dir_changed = True
 
         def on_moved(self, event):
@@ -127,17 +128,21 @@ class GitPlot(object):
     def wait_for_changes(self):
         global dir_changed
 
+        logging.info('Entering wait_for_changes...')
         dir_changed = False
         event_handler = self.GitPlotEventHandler()
         observer = Observer()
         observer.schedule(event_handler, self.args.repo_path, recursive=True)
         observer.start()
+        logging.info('Waiting for a change...')
         try:
             while not dir_changed:
                 time.sleep(0.5)
         except KeyboardInterrupt:
             observer.stop()
-        observer.join()
+        logging.info('Got a change...')
+        #observer.join()
+        logging.info('Leaving wait_for_changes...')
 
     def add_commit(self, commit):
         """ Add a commit to the tree. """
