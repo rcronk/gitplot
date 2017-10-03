@@ -560,6 +560,7 @@ def main(arguments):
 
     if git_plot.monitoring:
         while True:
+            git_plot = GitPlot(arguments)
             git_plot.wait_for_changes()
             git_plot.create_graph()
 
