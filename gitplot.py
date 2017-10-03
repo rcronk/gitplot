@@ -10,7 +10,8 @@ import time
 
 import graphviz
 import git
-import watchdog
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 __version__ = '0.1.0'
 dir_changed = False
@@ -106,7 +107,7 @@ class GitPlot(object):
     def monitoring(self):
         return self.args.monitor
 
-    class GitPlotEventHandler(watchdog.events.FileSystemEventHandler):
+    class GitPlotEventHandler(FileSystemEventHandler):
         def catch_all_handler(self, event):
             global dir_changed
             dir_changed = True
@@ -128,7 +129,7 @@ class GitPlot(object):
 
         dir_changed = False
         event_handler = self.GitPlotEventHandler()
-        observer = watchdog.observers.Observer()
+        observer = Observer()
         observer.schedule(event_handler, self.args.repo_path, recursive=True)
         observer.start()
         try:
