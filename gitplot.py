@@ -110,19 +110,22 @@ class GitPlot(object):
     class GitPlotEventHandler(FileSystemEventHandler):
         def catch_all_handler(self, event):
             global dir_changed
-            logging.info('Change detected...')
             dir_changed = True
 
         def on_moved(self, event):
+            logging.info('Move detected...')
             self.catch_all_handler(event)
 
         def on_created(self, event):
+            logging.info('Create detected...')
             self.catch_all_handler(event)
 
         def on_deleted(self, event):
+            logging.info('Delete detected...')
             self.catch_all_handler(event)
 
         def on_modified(self, event):
+            logging.info('Modify detected...')
             self.catch_all_handler(event)
 
     def wait_for_changes(self):
@@ -530,7 +533,13 @@ class GitPlot(object):
                         obj = None
 
         self.add_head('HEAD')
-        self.add_edge('HEAD', self.repo.head.ref.path)
+        try:
+            head_path = self.repo.head.ref.path
+        except TypeError as err:
+            # TODO: This is broken and needs to be a regex instead
+            head_path = err.args[0].split()[-1]
+            # re = r".*'(?P<hexsha>[0-9a-zA-Z]*)'"
+        self.add_edge('HEAD', head_path)
 
         if self.repo.index.entries:
             self.add_index()
@@ -563,7 +572,6 @@ def main(arguments):
             git_plot = GitPlot(arguments)
             git_plot.wait_for_changes()
             git_plot.create_graph()
-
 
 
 if __name__ == "__main__":
