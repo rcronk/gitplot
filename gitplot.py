@@ -2,6 +2,7 @@
 import inspect
 import sys
 import os
+import re
 import math
 import logging
 import argparse
@@ -536,10 +537,13 @@ class GitPlot(object):
         try:
             head_path = self.repo.head.ref.path
         except TypeError as err:
-            # TODO: This is broken and needs to be a regex instead
-            head_path = err.args[0].split()[-1]
-            # re = r".*'(?P<hexsha>[0-9a-zA-Z]*)'"
+            match = re.match(r".*'(?P<hexsha>[0-9a-zA-Z]*)'", err.args[0])
+            if match:
+                head_path = match.group('hexsha')
+            else:
+                raise
         self.add_edge('HEAD', head_path)
+        # Do we need to add HEAD as a ref to traverse?  Thinking of detached head with a commit on it.
 
         if self.repo.index.entries:
             self.add_index()
