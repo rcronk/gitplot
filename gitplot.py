@@ -342,7 +342,7 @@ class GitPlot(object):
 
     def add_edge(self, git_obj, parent):
         """ Add an edge between two nodes to the graph. """
-        obj_is_reference = isinstance(git_obj, git.Reference)
+        obj_is_reference = isinstance(git_obj, (git.Reference, git.Head, git.HEAD))
         obj_is_tag_commit = isinstance(git_obj, (git.TagObject, git.Commit))
         obj_is_tree = isinstance(git_obj, git.Tree)
         obj_is_str = isinstance(git_obj, str)
@@ -401,17 +401,14 @@ class GitPlot(object):
     def pre_scan(self):
         """ This scans the git objects and does some preprocessing. """
         logging.info('Pre-scanning the tree...')
-        if self.args.head_only:
-            self.refs = [x for x in self.repo.refs
-                         if x.path == self.repo.head.ref.path]
-        elif not self.args.exclude_remotes:
-            self.refs = self.repo.refs
+        self.refs += [self.repo.head]
+        if self.args.exclude_remotes:
+            self.refs += [x for x in self.repo.refs if 'remote' not in x.path]
         else:
-            self.refs = [x for x in self.repo.refs
-                         if 'remote' not in x.path]
+            self.refs += self.repo.refs
 
         for git_obj in self.refs:
-            if isinstance(git_obj, git.Head):
+            if isinstance(git_obj, (git.Head, git.HEAD)):
                 logging.info('Scanning head %s...', git_obj.path)
                 obj = git_obj.object
             elif isinstance(git_obj, git.Commit):
@@ -450,12 +447,23 @@ class GitPlot(object):
         logging.info('%d objects found.', num_objects)
         logging.info('calculated short hash length: %d', self.hash_length)
 
+    def get_head_path(self):
+        try:
+            head_path = self.repo.head.ref.path
+        except TypeError as err:
+            match = re.match(r".*'(?P<hexsha>[0-9a-zA-Z]*)'", err.args[0])
+            if match:
+                head_path = match.group('hexsha')
+            else:
+                raise
+        return head_path
+
     def draw_graph(self):
         """ Once pre-scanned, the graph can now be drawn. """
         # Final pass, build the graph
         logging.info('Creating tree diagram...')
         for git_obj in self.refs:
-            if isinstance(git_obj, git.Head):
+            if isinstance(git_obj, (git.Head, git.HEAD)):
                 logging.info('Processing head %s...', git_obj.path)
                 self.add_head(git_obj)
                 self.add_edge(git_obj, git_obj.object)
@@ -534,16 +542,7 @@ class GitPlot(object):
                         obj = None
 
         self.add_head('HEAD')
-        try:
-            head_path = self.repo.head.ref.path
-        except TypeError as err:
-            match = re.match(r".*'(?P<hexsha>[0-9a-zA-Z]*)'", err.args[0])
-            if match:
-                head_path = match.group('hexsha')
-            else:
-                raise
-        self.add_edge('HEAD', head_path)
-        # Do we need to add HEAD as a ref to traverse?  Thinking of detached head with a commit on it.
+        self.add_edge('HEAD', self.get_head_path())
 
         if self.repo.index.entries:
             self.add_index()
