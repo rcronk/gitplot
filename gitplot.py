@@ -82,7 +82,10 @@ class GitPlot(object):
         # Right to left (which makes the first commit appear on the far left)
         self.grv.graph_attr['rankdir'] = self.args.rank_direction
 
-        self.repo = git.Repo(self.args.repo_path)
+        try:
+            self.repo = git.Repo(self.args.repo_path)
+        except git.InvalidGitRepositoryError:
+            self.repo = None
 
         self.refs = []
 
@@ -133,15 +136,15 @@ class GitPlot(object):
         global dir_changed
 
         logging.info('Entering wait_for_changes...')
-        dir_changed = False
         event_handler = self.GitPlotEventHandler()
         observer = Observer()
         observer.schedule(event_handler, self.args.repo_path, recursive=True)
         observer.start()
         logging.info('Waiting for a change...')
         try:
+            dir_changed = False
             while not dir_changed:
-                time.sleep(0.5)
+                time.sleep(0.1)
         except KeyboardInterrupt:
             observer.stop()
         logging.info('Got a change...')
@@ -294,11 +297,15 @@ class GitPlot(object):
         """ This calculates and returns the blob hash for a file. """
         full_path = os.path.join(self.repo.working_dir, path)
         # content = open(full_path, encoding='utf-8').read()
-        content = open(full_path).read()
-        blob_content = 'blob %d\0%s' % (len(content), content)
-        hexsha = hashlib.sha1()
-        hexsha.update(blob_content.encode('utf-8'))
-        return hexsha.hexdigest()
+        if os.path.exists(full_path):
+            content = open(full_path).read()
+            blob_content = 'blob %d\0%s' % (len(content), content)
+            hexsha = hashlib.sha1()
+            hexsha.update(blob_content.encode('utf-8'))
+            hash = hexsha.hexdigest()
+        else:
+            hash = '?????'
+        return hash
 
     def add_untracked_file(self, untracked_file):
         """ Add an untracked file to the graph. """
@@ -342,7 +349,8 @@ class GitPlot(object):
 
     def add_edge(self, git_obj, parent):
         """ Add an edge between two nodes to the graph. """
-        obj_is_reference = isinstance(git_obj, (git.Reference, git.Head, git.HEAD))
+        obj_is_head = isinstance(git_obj, git.HEAD)
+        obj_is_reference = isinstance(git_obj, (git.Head, git.Reference))
         obj_is_tag_commit = isinstance(git_obj, (git.TagObject, git.Commit))
         obj_is_tree = isinstance(git_obj, git.Tree)
         obj_is_str = isinstance(git_obj, str)
@@ -350,7 +358,11 @@ class GitPlot(object):
         parent_is_tree = isinstance(parent, git.Tree)
         parent_is_str = isinstance(parent, str)
 
-        if obj_is_reference:
+        if obj_is_head:
+            label = 'HEAD'
+            first_node = git_obj.path
+            second_node = self.get_head_path()
+        elif obj_is_reference:
             label = str(type(git_obj)).lower()
             label = label.split('.')[-1][:-2]
             first_node = git_obj.path
@@ -401,51 +413,57 @@ class GitPlot(object):
     def pre_scan(self):
         """ This scans the git objects and does some preprocessing. """
         logging.info('Pre-scanning the tree...')
-        self.refs += [self.repo.head]
-        if self.args.exclude_remotes:
-            self.refs += [x for x in self.repo.refs if 'remote' not in x.path]
-        else:
-            self.refs += self.repo.refs
-
-        for git_obj in self.refs:
-            if isinstance(git_obj, (git.Head, git.HEAD)):
-                logging.info('Scanning head %s...', git_obj.path)
-                obj = git_obj.object
-            elif isinstance(git_obj, git.Commit):
-                logging.info('Scanning detected merge path from %s...',
-                             git_obj.hexsha)
-                obj = git_obj
-            elif isinstance(git_obj, git.Reference):
-                logging.info('Scanning reference %s...', git_obj.path)
-                obj = git_obj.commit
+        if self.repo:
+            self.refs += [self.repo.head]
+            if self.args.exclude_remotes:
+                self.refs += [x for x in self.repo.refs if 'remote' not in x.path]
             else:
-                raise Exception('unknown type: %s' % type(git_obj))
-            while obj.parents:
-                for parent in obj.parents[1:]:
-                    if parent.hexsha not in [x.hexsha for x in self.refs
-                                             if isinstance(x, git.Commit)]:
-                        self.refs.append(parent)  # Follow these paths later
-                        if parent in self.all_children:
-                            if obj not in self.all_children[parent]:
-                                self.all_children[parent] += [obj]
-                        else:
-                            self.all_children[parent] = [obj]
-                if obj.parents[0] in self.all_children:
-                    if obj not in self.all_children[obj.parents[0]]:
-                        self.all_children[obj.parents[0]] += [obj]
+                self.refs += self.repo.refs
+
+            for git_obj in self.refs:
+                if isinstance(git_obj, (git.Head, git.HEAD)):
+                    logging.info('Scanning head %s...', git_obj.path)
+                    try:
+                        obj = git_obj.object
+                    except ValueError as err:
+                        return  # Head points to non-existant ref - empty repo
+                elif isinstance(git_obj, git.Commit):
+                    logging.info('Scanning detected merge path from %s...',
+                                 git_obj.hexsha)
+                    obj = git_obj
+                elif isinstance(git_obj, git.Reference):
+                    logging.info('Scanning reference %s...', git_obj.path)
+                    obj = git_obj.commit
                 else:
-                    self.all_children[obj.parents[0]] = [obj]
-                obj = obj.parents[0]
+                    raise Exception('unknown type: %s' % type(git_obj))
+                while obj.parents:
+                    for parent in obj.parents[1:]:
+                        if parent.hexsha not in [x.hexsha for x in self.refs
+                                                 if isinstance(x, git.Commit)]:
+                            self.refs.append(parent)  # Follow these paths later
+                            if parent in self.all_children:
+                                if obj not in self.all_children[parent]:
+                                    self.all_children[parent] += [obj]
+                            else:
+                                self.all_children[parent] = [obj]
+                    if obj.parents[0] in self.all_children:
+                        if obj not in self.all_children[obj.parents[0]]:
+                            self.all_children[obj.parents[0]] += [obj]
+                    else:
+                        self.all_children[obj.parents[0]] = [obj]
+                    obj = obj.parents[0]
 
-        # Calculate length of the short hash based on the total # of objects
-        num_objects = len(self.all_children)
-        if num_objects:
-            self.hash_length = max(5, int(math.ceil(math.log(num_objects) *
-                                                    math.log(math.e, 2) / 2)))
+            # Calculate length of the short hash based on the total # of objects
+            num_objects = len(self.all_children)
+            if num_objects:
+                self.hash_length = max(5, int(math.ceil(math.log(num_objects) *
+                                                        math.log(math.e, 2) / 2)))
 
-        logging.info('Pre-scan finished.')
-        logging.info('%d objects found.', num_objects)
-        logging.info('calculated short hash length: %d', self.hash_length)
+            logging.info('Pre-scan finished.')
+            logging.info('%d objects found.', num_objects)
+            logging.info('calculated short hash length: %d', self.hash_length)
+        else:
+            logging.info('no git repo found')
 
     def get_head_path(self):
         try:
@@ -466,7 +484,10 @@ class GitPlot(object):
             if isinstance(git_obj, (git.Head, git.HEAD)):
                 logging.info('Processing head %s...', git_obj.path)
                 self.add_head(git_obj)
-                self.add_edge(git_obj, git_obj.object)
+                try:
+                    self.add_edge(git_obj, git_obj.object)
+                except ValueError as error:
+                    continue
                 obj = git_obj.object
             elif isinstance(git_obj, git.Commit):
                 logging.info('Processing detected merge path from %s...',
@@ -541,20 +562,23 @@ class GitPlot(object):
                     else:
                         obj = None
 
-        self.add_head('HEAD')
-        self.add_edge('HEAD', self.get_head_path())
+        if self.repo:
+            self.add_head('HEAD')
+            self.add_edge('HEAD', self.get_head_path())
 
-        if self.repo.index.entries:
-            self.add_index()
-            for key in self.repo.index.entries:
-                self.add_index_entry(self.repo.index.entries[key])
+            if self.repo.index.entries:
+                self.add_index()
+                for key in self.repo.index.entries:
+                    self.add_index_entry(self.repo.index.entries[key])
 
-        if self.repo.untracked_files:
-            self.add_untracked()
-            for untracked_file in self.repo.untracked_files:
-                self.add_untracked_file(untracked_file)
+            if self.repo.untracked_files:
+                self.add_untracked()
+                for untracked_file in self.repo.untracked_files:
+                    self.add_untracked_file(untracked_file)
+        else:
+            self.add_head('No git repo found')
 
-        output_filename = os.path.basename(self.repo.working_tree_dir) + '.dot'
+        output_filename = os.path.basename(self.args.repo_path) + '.dot'
         logging.info('Rendering graph %s...', output_filename)
         self.grv.render(filename=output_filename, view=True, cleanup=True)
         logging.info('Done.')
@@ -575,6 +599,7 @@ def main(arguments):
             git_plot = GitPlot(arguments)
             git_plot.wait_for_changes()
             git_plot.create_graph()
+            time.sleep(1)  # Let the directory settle before checking for changes again
 
 
 if __name__ == "__main__":
