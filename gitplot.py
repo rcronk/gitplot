@@ -1,5 +1,4 @@
 """ GitPlot - The git plotter. """
-import inspect
 import sys
 import os
 import re
@@ -15,7 +14,8 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 __version__ = '0.1.0'
-dir_changed = False
+DIR_CHANGED = False
+
 
 class GitPlot(object):
     """ GitPlot main class. """
@@ -109,31 +109,39 @@ class GitPlot(object):
 
     @property
     def monitoring(self):
+        """ Returns True if we're monitoring. """
         return self.args.monitor
 
     class GitPlotEventHandler(FileSystemEventHandler):
-        def catch_all_handler(self, event):
-            global dir_changed
-            dir_changed = True
+        """ Class that handles directory/file changes. """
+        def catch_all_handler(self):
+            """ If any change happens, set DIR_CHANGED to True. """
+            global DIR_CHANGED
+            DIR_CHANGED = True
 
         def on_moved(self, event):
+            """ If a file is moved, call the catch-all handler to set DIR_CHANGED. """
             logging.info('Move detected...')
-            self.catch_all_handler(event)
+            self.catch_all_handler()
 
         def on_created(self, event):
+            """ If a file is created, call the catch-all handler to set DIR_CHANGED. """
             logging.info('Create detected...')
-            self.catch_all_handler(event)
+            self.catch_all_handler()
 
         def on_deleted(self, event):
+            """ If a file is deleted, call the catch-all handler to set DIR_CHANGED. """
             logging.info('Delete detected...')
-            self.catch_all_handler(event)
+            self.catch_all_handler()
 
         def on_modified(self, event):
+            """ If a file is modofied, call the catch-all handler to set DIR_CHANGED. """
             logging.info('Modify detected...')
-            self.catch_all_handler(event)
+            self.catch_all_handler()
 
     def wait_for_changes(self):
-        global dir_changed
+        """ We wait for changes to the directory structure here. """
+        global DIR_CHANGED
 
         logging.info('Entering wait_for_changes...')
         event_handler = self.GitPlotEventHandler()
@@ -142,13 +150,13 @@ class GitPlot(object):
         observer.start()
         logging.info('Waiting for a change...')
         try:
-            dir_changed = False
-            while not dir_changed:
+            DIR_CHANGED = False
+            while not DIR_CHANGED:
                 time.sleep(0.1)
         except KeyboardInterrupt:
             observer.stop()
         logging.info('Got a change...')
-        #observer.join()
+        # observer.join()
         logging.info('Leaving wait_for_changes...')
 
     def add_commit(self, commit):
@@ -242,10 +250,10 @@ class GitPlot(object):
             index_to_repo_delta = [x.a_path for x in self.repo.index.diff(self.repo.head.commit)]
         except ValueError as error:
             if error.args[0] == "Reference at 'refs/heads/master' does not exist":
-                # The repo is empty, and HEAD is pointing to /refs/heads/master and that ref doesn't exist until
-                # the first commit exists so the ref can point to something.  We'll therefore just take all the
-                # entries in the index as the diff between the index and the repo.  This only happens on an empty
-                # repo.
+                # The repo is empty, and HEAD is pointing to /refs/heads/master and that ref
+                # doesn't exist until the first commit exists so the ref can point to something.
+                # We'll therefore just take all the entries in the index as the diff between the
+                # index and the repo.  This only happens on an empty repo.
                 index_to_repo_delta = [x[0] for x in self.repo.index.entries]
             else:
                 # Some unknown ValueError occurred
@@ -302,10 +310,10 @@ class GitPlot(object):
             blob_content = 'blob %d\0%s' % (len(content), content)
             hexsha = hashlib.sha1()
             hexsha.update(blob_content.encode('utf-8'))
-            hash = hexsha.hexdigest()
+            blob_hash = hexsha.hexdigest()
         else:
-            hash = '?????'
-        return hash
+            blob_hash = '?????'
+        return blob_hash
 
     def add_untracked_file(self, untracked_file):
         """ Add an untracked file to the graph. """
@@ -425,7 +433,7 @@ class GitPlot(object):
                     logging.info('Scanning head %s...', git_obj.path)
                     try:
                         obj = git_obj.object
-                    except ValueError as err:
+                    except ValueError:
                         return  # Head points to non-existant ref - empty repo
                 elif isinstance(git_obj, git.Commit):
                     logging.info('Scanning detected merge path from %s...',
@@ -466,6 +474,7 @@ class GitPlot(object):
             logging.info('no git repo found')
 
     def get_head_path(self):
+        """ Returns the head path. """
         try:
             head_path = self.repo.head.ref.path
         except TypeError as err:
@@ -486,7 +495,7 @@ class GitPlot(object):
                 self.add_head(git_obj)
                 try:
                     self.add_edge(git_obj, git_obj.object)
-                except ValueError as error:
+                except ValueError:
                     continue
                 obj = git_obj.object
             elif isinstance(git_obj, git.Commit):

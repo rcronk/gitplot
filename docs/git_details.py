@@ -1,4 +1,4 @@
-import tools
+from docs import tools
 
 rc = tools.RepoTools()
 rc.create_file('file1.txt')
