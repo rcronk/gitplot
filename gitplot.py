@@ -45,21 +45,16 @@ class GitPlot(object):
 
         parser = argparse.ArgumentParser()
         parser.add_argument('--repo-path', help='Path to the git repo.',
-                            # default=r'C:\Users\24860\OneDrive\...\code\temprepo-jjymki0k')
-                            # default=r'D:\OneDrive\Personal\Documents\...\code\temprepo-jjymki0k')
-                            # default=r'C:\Users\24860\code\git\devtools')
-                            # default=r'C:\Users\24860\code\git\common')
-                            # default=r'C:\Users\24860\Documents\hti')
-                            # default=r'C:\ftl')
-                            # default=r'C:\Users\cronk\PycharmProjects\mutate')
-                            default=r'.')
+                            # default=r'C:\Users\robert.cronk\Documents\mutate')
+                            default=r'C:\Users\robert.cronk\Documents\es')
+                            # default=r'.')
         parser.add_argument('--verbose', help='Include trees and blobs, etc.',
-                            action='store_true', default=False)
+                            action='store_true', default=True)
         parser.add_argument('--max-commit-depth', type=int, default=10)
         parser.add_argument('--output-format', type=str, default='svg')
         parser.add_argument('--rank-direction', type=str, default='RL')
         parser.add_argument('--collapse-commits', action="store_true",
-                            default=False)
+                            default=True)
         parser.add_argument('--exclude-remotes', action="store_true",
                             default=False)
         parser.add_argument('--head-only', action="store_true", default=False)
