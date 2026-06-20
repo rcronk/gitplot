@@ -25,7 +25,7 @@ class _RepoEventHandler(FileSystemEventHandler):
     def __init__(self, change_event: threading.Event, ignore_paths: set[str]) -> None:
         super().__init__()
         self._event = change_event
-        self._ignore_paths = ignore_paths   # absolute path strings to skip
+        self._ignore_paths = ignore_paths  # absolute path strings to skip
 
     def _handle(self, event_path: str) -> None:
         abs_path = str(Path(event_path).resolve())

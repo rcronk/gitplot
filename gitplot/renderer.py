@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
-import os
 import platform
 import shutil
 import subprocess
@@ -74,7 +73,7 @@ class Renderer:
     def _open_html(self, svg_path: Path) -> None:
         """Write display.html next to the SVG and open it once."""
         if self._html_written:
-            return   # Already open; SVG polling handles subsequent updates
+            return  # Already open; SVG polling handles subsequent updates
 
         html_path = svg_path.parent / "gitplot.html"
         _write_display_html(html_path, svg_path.name)
