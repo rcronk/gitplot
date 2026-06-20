@@ -25,6 +25,27 @@ def test_mermaid_header_rankdir_lr():
     assert out.startswith("flowchart LR")
 
 
+def test_mermaid_node_unquoted_label():
+    """Unquoted DOT label (label=short) must appear as display label, not the full node ID.
+
+    graphviz omits quotes around a label when it's a plain alphanumeric word;
+    the label regex must handle this or the full node ID leaks into the output.
+    """
+    # Node ID = full hash starting with a letter (graphviz leaves it unquoted).
+    # Label   = short 5-char hash (also alphanumeric → also unquoted by graphviz).
+    dot = (
+        "digraph {\n"
+        '\ta160d5d8e8db2bcdde95e98515bbe496f4768e60 [label=a160d color="0.1 1.0 1.0"'
+        ' fillcolor="0.1 0.1 1.0" penwidth=2 style=filled]\n'
+        "}\n"
+    )
+    out = dot_to_mermaid(dot)
+    # Display label must be the short hash, not the 40-char node ID
+    assert '["a160d"]' in out
+    # Full hash must not appear between [ and ] (i.e. not used as a label)
+    assert '["a160d5d8e8db2bcdde95e98515bbe496f4768e60"]' not in out
+
+
 def test_mermaid_node_with_label():
     dot = (
         "digraph {\n"
@@ -63,6 +84,60 @@ def test_mermaid_stash_node_id_sanitized():
     assert lines, "Expected a line with the stash label"
     node_id = lines[0].split("[")[0].strip()
     assert "@" not in node_id and "{" not in node_id and "}" not in node_id
+
+
+_NODE_COLORED = (
+    '\tabc123 [label="abc12" color="0.000 1.000 1.000"'
+    ' fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]'
+)
+_NODE_RED = (
+    '\tabc123 [label="abc12" color="0.000 1.000 1.000"'
+    ' fillcolor="0.000 1.000 1.000" penwidth=2 style=filled]'
+)
+_NODE_TINTED = (
+    '\tabc123 [label="abc12" color="0.222 1.000 1.000"'
+    ' fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]'
+)
+
+
+def test_mermaid_style_line_emitted_for_colored_node():
+    """Nodes with fillcolor/color HSV attrs must produce a Mermaid style directive."""
+    out = dot_to_mermaid(f"digraph {{\n{_NODE_COLORED}\n}}\n")
+    assert "style abc123" in out
+    assert "fill:#" in out
+    assert "stroke:#" in out
+
+
+def test_mermaid_hsv_pure_red_to_hex():
+    """HSV(0, 1, 1) = pure red = #ff0000 for both fill and stroke."""
+    out = dot_to_mermaid(f"digraph {{\n{_NODE_RED}\n}}\n")
+    assert "fill:#ff0000" in out
+    assert "stroke:#ff0000" in out
+
+
+def test_mermaid_hsv_fill_lighter_than_stroke():
+    """fillcolor (low saturation) produces a lighter hex than color (high saturation)."""
+    # color = HSV(0.222, 1.0, 1.0) — vivid; fillcolor = HSV(0.222, 0.1, 1.0) — pale
+    out = dot_to_mermaid(f"digraph {{\n{_NODE_TINTED}\n}}\n")
+    assert "style abc123 fill:#" in out
+    style_line = next(p for p in out.splitlines() if "fill:#" in p)
+    fill_hex = style_line.split("fill:#")[1].split(",")[0]
+    stroke_hex = style_line.split("stroke:#")[1].split(",")[0].rstrip()
+    assert fill_hex != stroke_hex
+
+
+def test_mermaid_integration_has_style_lines(repo: RepoTools):
+    """A real repo built with output_format='mermaid' must have style lines in the output."""
+    repo.write("a.txt")
+    repo.commit("first")
+    graph = GitRepo(str(repo.path)).build_graph()
+    builder = GraphBuilder(mode="normal", rank_direction="RL", output_format="mermaid")
+    dg = builder.build(graph)
+    from gitplot.mermaid import dot_to_mermaid
+
+    out = dot_to_mermaid(dg.source)
+    assert "style " in out
+    assert "fill:#" in out
 
 
 def test_mermaid_edge_no_label():
