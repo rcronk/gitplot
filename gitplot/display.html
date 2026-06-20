@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>GitPlot</title>
+  <style>
+    body { margin: 0; background: #1e1e1e; display: flex; flex-direction: column; height: 100vh; }
+    #status { background: #333; color: #aaa; padding: 4px 8px; font: 12px monospace; flex-shrink: 0; }
+    #container { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; padding: 8px; }
+  </style>
+</head>
+<body>
+  <div id="status">Connecting to gitplot...</div>
+  <div id="container"></div>
+  <script>
+    const SVG = '{{SVG_FILENAME}}';
+    let seq = 0;
+    function refresh() {
+      const obj = document.createElement('object');
+      obj.type = 'image/svg+xml';
+      obj.data = SVG + '?t=' + (++seq);
+      obj.style.maxWidth = '100%';
+      obj.style.maxHeight = '100%';
+      const c = document.getElementById('container');
+      const old = c.firstChild;
+      c.appendChild(obj);
+      if (old) c.removeChild(old);
+      document.getElementById('status').textContent =
+        'Updated: ' + new Date().toLocaleTimeString();
+      setTimeout(refresh, 1000);
+    }
+    refresh();
+  </script>
+</body>
+</html>

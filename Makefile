@@ -1,5 +1,13 @@
 init:
-	pip install -r requirements.txt
+	pip install -e ".[dev]"
 
 test:
-	nosetests tests
+	pytest tests/ -v
+
+lint:
+	ruff check gitplot/ tests/
+
+format:
+	ruff format gitplot/ tests/
+
+.PHONY: init test lint format

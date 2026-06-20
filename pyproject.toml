@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gitplot"
+version = "0.2.0"
+description = "Graphviz visualizations of git repository structure"
+readme = "readme.rst"
+license = { file = "LICENSE" }
+authors = [{ name = "Robert Cronk", email = "cronk.r@gmail.com" }]
+requires-python = ">=3.9"
+dependencies = [
+    "gitpython>=3.1",
+    "graphviz>=0.20",
+    "watchdog>=3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+gitplot = "gitplot.cli:main"
+
+[project.urls]
+Repository = "https://github.com/rcronk/gitplot"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gitplot*"]
+
+[tool.setuptools.package-data]
+gitplot = ["display.html"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

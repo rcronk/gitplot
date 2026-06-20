@@ -1,0 +1,507 @@
+"""Git repository wrapper and data model.
+
+All GitPython usage is confined to this module; no GitPython objects leak out.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import math
+from collections import deque
+from dataclasses import dataclass, field
+from typing import Optional
+
+import git
+
+log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Data transfer objects
+# ---------------------------------------------------------------------------
+
+@dataclass
+class RefInfo:
+    """A git reference (branch, tag, HEAD, remote) with its resolved commit."""
+    path: str           # full ref path, e.g. "refs/heads/main"
+    name: str           # short display name, e.g. "main"
+    commit_hexsha: str
+    is_head: bool = False
+    is_branch: bool = False
+    is_tag: bool = False
+    is_remote: bool = False
+    tag_object_hexsha: Optional[str] = None  # set for annotated tags
+
+
+@dataclass
+class CommitData:
+    """Lightweight representation of a git commit."""
+    hexsha: str
+    parents: list[str]                            # parent hexshas in order
+    children: set[str] = field(default_factory=set)   # child hexshas (built post-BFS)
+    refs: list[RefInfo] = field(default_factory=list)  # refs pointing here
+    short_message: str = ""
+    author: str = ""
+    date_iso: str = ""
+    tree_hexsha: Optional[str] = None            # populated in verbose mode
+
+
+@dataclass
+class TreeData:
+    """Lightweight representation of a git tree (directory)."""
+    hexsha: str
+    name: str                                    # basename; "/" for root
+    parent_hexsha: str                           # parent commit or tree hexsha
+    child_tree_hexshas: list[str] = field(default_factory=list)
+    blob_hexshas: list[str] = field(default_factory=list)
+
+
+@dataclass
+class BlobData:
+    """Lightweight representation of a git blob (file)."""
+    hexsha: str
+    name: str           # filename
+    parent_tree_hexsha: str
+
+
+@dataclass
+class StagedFile:
+    path: str
+    hexsha: str         # blob SHA in the index
+
+
+@dataclass
+class UnstagedFile:
+    path: str
+    workspace_hexsha: str   # computed blob SHA of the working-tree file
+
+
+@dataclass
+class IndexState:
+    staged: list[StagedFile]
+    unstaged: list[UnstagedFile]
+    untracked: list[str]
+
+
+@dataclass
+class BranchNode:
+    name: str
+    path: str
+    commit_hexsha: str
+    is_head: bool = False
+    is_remote: bool = False
+    is_tag: bool = False
+
+
+@dataclass
+class BranchEdge:
+    from_name: str
+    to_name: str
+
+
+@dataclass
+class BranchTopology:
+    nodes: list[BranchNode]
+    edges: list[BranchEdge]
+    head_branch: Optional[str]   # branch name if not detached
+    head_commit: Optional[str]   # hexsha if detached
+
+
+@dataclass
+class RepoGraph:
+    """Complete traversal result consumed by GraphBuilder."""
+    commits: dict[str, CommitData]
+    trees: dict[str, TreeData]    # empty unless include_trees=True
+    blobs: dict[str, BlobData]    # empty unless include_trees=True
+    refs: list[RefInfo]           # HEAD first, then branches, tags, remotes
+    head_branch_path: Optional[str]   # branch ref path when not detached
+    is_detached: bool
+    hash_length: int
+
+
+# ---------------------------------------------------------------------------
+# GitRepo
+# ---------------------------------------------------------------------------
+
+class GitRepo:
+    """Wraps a git.Repo and provides the data model that GraphBuilder consumes."""
+
+    def __init__(self, repo_path: str) -> None:
+        self.path = repo_path
+        try:
+            self._repo = git.Repo(repo_path)
+            self.valid = not self._repo.bare
+        except (git.InvalidGitRepositoryError, git.NoSuchPathError):
+            self._repo = None
+            self.valid = False
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def build_graph(
+        self,
+        max_depth: Optional[int] = None,
+        exclude_remotes: bool = False,
+        include_trees: bool = False,
+    ) -> RepoGraph:
+        """Traverse the repo and return a complete graph snapshot."""
+        if not self.valid:
+            return RepoGraph(
+                commits={}, trees={}, blobs={}, refs=[],
+                head_branch_path=None, is_detached=False, hash_length=5,
+            )
+
+        repo = self._repo
+
+        # HEAD state
+        is_detached = repo.head.is_detached
+        try:
+            head_branch_path = None if is_detached else repo.head.ref.path
+        except Exception:
+            head_branch_path = None
+
+        refs = self._collect_refs(exclude_remotes)
+        if not refs:
+            return RepoGraph(
+                commits={}, trees={}, blobs={}, refs=[],
+                head_branch_path=head_branch_path, is_detached=is_detached,
+                hash_length=5,
+            )
+
+        commits, trees, blobs = self._bfs_commits(refs, max_depth, include_trees)
+        self._build_children(commits)
+        self._attribute_refs(commits, refs)
+
+        n = len(commits)
+        hash_length = max(5, int(math.ceil(math.log(n) * math.log(math.e, 2) / 2))) if n > 1 else 5
+
+        return RepoGraph(
+            commits=commits,
+            trees=trees,
+            blobs=blobs,
+            refs=refs,
+            head_branch_path=head_branch_path,
+            is_detached=is_detached,
+            hash_length=hash_length,
+        )
+
+    def get_index_state(self) -> IndexState:
+        """Return staged, unstaged, and untracked file info."""
+        if not self.valid:
+            return IndexState(staged=[], unstaged=[], untracked=[])
+
+        repo = self._repo
+        staged: list[StagedFile] = []
+        unstaged: list[UnstagedFile] = []
+
+        # Staged: index vs HEAD commit
+        try:
+            head_commit = repo.head.commit
+            for diff in repo.index.diff(head_commit):
+                path = diff.b_path or diff.a_path
+                hexsha = diff.b_blob.hexsha if diff.b_blob else "0" * 40
+                staged.append(StagedFile(path=path, hexsha=hexsha))
+        except ValueError:
+            # Empty repo: every index entry is staged
+            for (path, _stage), entry in repo.index.entries.items():
+                staged.append(StagedFile(path=path, hexsha=entry.hexsha))
+        except Exception as exc:
+            log.warning("Could not compute staged diff: %s", exc)
+
+        # Unstaged: working tree vs index
+        try:
+            for diff in repo.index.diff(None):
+                path = diff.a_path
+                ws_hexsha = self._compute_blob_hash(path)
+                unstaged.append(UnstagedFile(path=path, workspace_hexsha=ws_hexsha))
+        except Exception as exc:
+            log.warning("Could not compute unstaged diff: %s", exc)
+
+        return IndexState(
+            staged=staged,
+            unstaged=unstaged,
+            untracked=list(repo.untracked_files),
+        )
+
+    def get_branch_topology(self, exclude_remotes: bool = False) -> BranchTopology:
+        """Compute branch ancestry relationships for branch-topology mode."""
+        if not self.valid:
+            return BranchTopology(nodes=[], edges=[], head_branch=None, head_commit=None)
+
+        repo = self._repo
+        nodes: list[BranchNode] = []
+
+        try:
+            head_branch = None if repo.head.is_detached else repo.head.ref.name
+            head_commit = repo.head.commit.hexsha if repo.head.is_detached else None
+        except Exception:
+            head_branch = None
+            head_commit = None
+
+        for branch in repo.branches:
+            try:
+                nodes.append(BranchNode(
+                    name=branch.name,
+                    path=branch.path,
+                    commit_hexsha=branch.commit.hexsha,
+                    is_head=(head_branch == branch.name),
+                ))
+            except Exception:
+                pass
+
+        if not exclude_remotes:
+            try:
+                for rref in repo.remote_refs:
+                    try:
+                        nodes.append(BranchNode(
+                            name=rref.name,
+                            path=rref.path,
+                            commit_hexsha=rref.commit.hexsha,
+                            is_remote=True,
+                        ))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        for tag in repo.tags:
+            try:
+                nodes.append(BranchNode(
+                    name=tag.name,
+                    path=tag.path,
+                    commit_hexsha=tag.commit.hexsha,
+                    is_tag=True,
+                ))
+            except Exception:
+                pass
+
+        edges = self._compute_branch_edges(nodes)
+        return BranchTopology(
+            nodes=nodes, edges=edges,
+            head_branch=head_branch, head_commit=head_commit,
+        )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _collect_refs(self, exclude_remotes: bool) -> list[RefInfo]:
+        """Return refs in traversal order: HEAD, branches, tags, remotes."""
+        repo = self._repo
+        refs: list[RefInfo] = []
+        seen: set[str] = set()
+
+        # HEAD (always first)
+        try:
+            head_commit = repo.head.commit
+        except ValueError:
+            return []   # empty repo with no commits yet
+
+        refs.append(RefInfo(
+            path="HEAD",
+            name="HEAD",
+            commit_hexsha=head_commit.hexsha,
+            is_head=True,
+        ))
+        seen.add("HEAD")
+
+        # Local branches
+        for branch in repo.branches:
+            if branch.path not in seen:
+                seen.add(branch.path)
+                try:
+                    refs.append(RefInfo(
+                        path=branch.path,
+                        name=branch.name,
+                        commit_hexsha=branch.commit.hexsha,
+                        is_branch=True,
+                    ))
+                except Exception:
+                    pass
+
+        # Tags
+        for tag in repo.tags:
+            if tag.path not in seen:
+                seen.add(tag.path)
+                try:
+                    is_annotated = isinstance(tag.object, git.TagObject)
+                    refs.append(RefInfo(
+                        path=tag.path,
+                        name=tag.name,
+                        commit_hexsha=tag.commit.hexsha,
+                        is_tag=True,
+                        tag_object_hexsha=tag.object.hexsha if is_annotated else None,
+                    ))
+                except Exception:
+                    pass
+
+        # Remote refs
+        if not exclude_remotes:
+            try:
+                for rref in repo.remote_refs:
+                    if rref.path not in seen:
+                        seen.add(rref.path)
+                        try:
+                            refs.append(RefInfo(
+                                path=rref.path,
+                                name=rref.name,
+                                commit_hexsha=rref.commit.hexsha,
+                                is_remote=True,
+                            ))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        return refs
+
+    def _bfs_commits(
+        self,
+        refs: list[RefInfo],
+        max_depth: Optional[int],
+        include_trees: bool,
+    ) -> tuple[dict[str, CommitData], dict[str, TreeData], dict[str, BlobData]]:
+        """Multi-source BFS from all ref tips; returns commit/tree/blob dicts."""
+        repo = self._repo
+        commits: dict[str, CommitData] = {}
+        trees: dict[str, TreeData] = {}
+        blobs: dict[str, BlobData] = {}
+
+        visited: set[str] = set()
+        queue: deque[tuple[git.Commit, int]] = deque()
+
+        for ref in refs:
+            hexsha = ref.commit_hexsha
+            if hexsha not in visited:
+                try:
+                    commit_obj = repo.commit(hexsha)
+                    queue.append((commit_obj, 0))
+                except Exception as exc:
+                    log.warning("Cannot resolve %s (%s): %s", ref.path, hexsha[:8], exc)
+
+        while queue:
+            commit_obj, depth = queue.popleft()
+            hexsha = commit_obj.hexsha
+            if hexsha in visited:
+                continue
+            visited.add(hexsha)
+
+            parent_hexshas = [p.hexsha for p in commit_obj.parents]
+            msg = (commit_obj.message or "").split("\n")[0][:72]
+
+            commits[hexsha] = CommitData(
+                hexsha=hexsha,
+                parents=parent_hexshas,
+                short_message=msg,
+                author=commit_obj.author.name,
+                date_iso=commit_obj.authored_datetime.isoformat(),
+                tree_hexsha=commit_obj.tree.hexsha if include_trees else None,
+            )
+
+            if include_trees:
+                self._collect_tree(commit_obj.tree, hexsha, trees, blobs)
+
+            if max_depth is None or depth < max_depth:
+                for parent in commit_obj.parents:
+                    if parent.hexsha not in visited:
+                        queue.append((parent, depth + 1))
+
+        return commits, trees, blobs
+
+    def _build_children(self, commits: dict[str, CommitData]) -> None:
+        """Populate CommitData.children from each commit's parents list."""
+        for hexsha, cd in commits.items():
+            for parent_hexsha in cd.parents:
+                if parent_hexsha in commits:
+                    commits[parent_hexsha].children.add(hexsha)
+
+    def _attribute_refs(self, commits: dict[str, CommitData], refs: list[RefInfo]) -> None:
+        """Attach each RefInfo to the CommitData it points at."""
+        for ref in refs:
+            if ref.commit_hexsha in commits:
+                commits[ref.commit_hexsha].refs.append(ref)
+
+    def _collect_tree(
+        self,
+        tree: git.Tree,
+        parent_hexsha: str,
+        trees: dict[str, TreeData],
+        blobs: dict[str, BlobData],
+    ) -> None:
+        """Recursively collect tree and blob objects (verbose mode)."""
+        if tree.hexsha in trees:
+            return
+
+        trees[tree.hexsha] = TreeData(
+            hexsha=tree.hexsha,
+            name=tree.name or "/",
+            parent_hexsha=parent_hexsha,
+            child_tree_hexshas=[t.hexsha for t in tree.trees],
+            blob_hexshas=[b.hexsha for b in tree.blobs],
+        )
+
+        for blob in tree.blobs:
+            if blob.hexsha not in blobs:
+                blobs[blob.hexsha] = BlobData(
+                    hexsha=blob.hexsha,
+                    name=blob.name,
+                    parent_tree_hexsha=tree.hexsha,
+                )
+
+        for subtree in tree.trees:
+            self._collect_tree(subtree, tree.hexsha, trees, blobs)
+
+    def _compute_blob_hash(self, path: str) -> str:
+        """Compute git's blob SHA for a working-tree file."""
+        import os
+        full_path = os.path.join(self._repo.working_dir, path)
+        try:
+            with open(full_path, "rb") as fh:
+                content = fh.read()
+            header = b"blob %d\0" % len(content)
+            return hashlib.sha1(header + content).hexdigest()
+        except OSError:
+            return "?" * 40
+
+    def _compute_branch_edges(self, nodes: list[BranchNode]) -> list[BranchEdge]:
+        """For each node find its nearest ancestor branch; return edges."""
+        repo = self._repo
+        edges: list[BranchEdge] = []
+
+        for node in nodes:
+            parent = self._find_nearest_ancestor(node, nodes, repo)
+            if parent:
+                edges.append(BranchEdge(from_name=parent.name, to_name=node.name))
+
+        return edges
+
+    def _find_nearest_ancestor(
+        self,
+        node: BranchNode,
+        all_nodes: list[BranchNode],
+        repo: git.Repo,
+    ) -> Optional[BranchNode]:
+        """Return the most-recently-committed branch whose tip is an ancestor of node."""
+        try:
+            node_commit = repo.commit(node.commit_hexsha)
+        except Exception:
+            return None
+
+        best: Optional[tuple[BranchNode, int]] = None   # (node, committed_date)
+        for other in all_nodes:
+            if other.name == node.name or other.commit_hexsha == node.commit_hexsha:
+                continue
+            try:
+                other_commit = repo.commit(other.commit_hexsha)
+                bases = repo.merge_base(node_commit, other_commit)
+                if bases and bases[0].hexsha == other_commit.hexsha:
+                    # other's tip is an ancestor of node's tip
+                    date = other_commit.committed_date
+                    if best is None or date > best[1]:
+                        best = (other, date)
+            except Exception:
+                pass
+
+        return best[0] if best else None
