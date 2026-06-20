@@ -16,6 +16,14 @@ import git
 
 log = logging.getLogger(__name__)
 
+# Lower number = more "base" branch; used to pick edge direction when two
+# branches share the same tip commit (e.g. after a fast-forward merge).
+_BRANCH_PRIORITY: dict[str, int] = {"master": 0, "main": 0, "develop": 1, "dev": 1}
+
+
+def _branch_priority(name: str) -> int:
+    return _BRANCH_PRIORITY.get(name, 2)
+
 
 # ---------------------------------------------------------------------------
 # Data transfer objects
@@ -504,6 +512,19 @@ class GitRepo:
         for i, na in enumerate(nodes):
             for nb in nodes[i + 1:]:
                 if na.commit_hexsha == nb.commit_hexsha:
+                    # Same tip commit: connect via a direct edge using name priority
+                    # so e.g. "master" appears as parent of "develop" (not disconnected).
+                    if _branch_priority(na.name) <= _branch_priority(nb.name):
+                        parent, child = na, nb
+                    else:
+                        parent, child = nb, na
+                    try:
+                        date = repo.commit(parent.commit_hexsha).committed_date
+                    except Exception:
+                        date = 0
+                    self._maybe_update_parent(
+                        parent_map, child.name, parent.name, True, date
+                    )
                     continue
                 try:
                     ca = repo.commit(na.commit_hexsha)

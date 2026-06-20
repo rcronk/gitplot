@@ -302,3 +302,213 @@ def test_no_duplicate_nodes(repo: RepoTools):
     node_declarations = src.count(f'"{sha}"')
     # 1 node def + edges referencing it; node def itself appears at most a few times
     assert node_declarations <= 3   # generous upper bound; duplication would be 10+
+
+
+# ---------------------------------------------------------------------------
+# Branch mode: same-commit branches
+# ---------------------------------------------------------------------------
+
+def test_branch_same_commit_connected(repo: RepoTools):
+    """Two branches at the same commit must be connected, not floating islands."""
+    repo.write("a.txt")
+    repo.commit("base")
+    # Create develop at the same tip as main (no new commits)
+    repo.checkout("develop", new=True)
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    assert node_in(src, "main")
+    assert node_in(src, "develop")
+    # Must have an edge between them in either direction
+    assert edge_in(src, "main", "develop") or edge_in(src, "develop", "main"), (
+        "Branches at the same commit must be connected by an edge"
+    )
+
+
+def test_branch_same_commit_priority_direction(repo: RepoTools):
+    """When master and develop share a commit, master is shown as parent of develop."""
+    repo.write("a.txt")
+    repo.commit("base")
+    # Rename default branch to master and create develop at same tip
+    repo._run(["git", "branch", "-m", "main", "master"])
+    repo.checkout("develop", new=True)
+    repo.checkout("master")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # master has priority 0, develop has priority 1 → master is parent
+    assert edge_in(src, "master", "develop")
+
+
+def test_branch_ff_merge_stays_connected(repo: RepoTools):
+    """After a fast-forward merge develop stays connected to the branch it absorbed."""
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature-work")
+    # Fast-forward main to feature
+    repo.checkout("main")
+    repo.merge("feature", no_ff=False)
+    # Now main and feature are at the same commit
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    assert node_in(src, "main")
+    assert node_in(src, "feature")
+    assert edge_in(src, "main", "feature") or edge_in(src, "feature", "main")
+
+
+# ---------------------------------------------------------------------------
+# Branch mode: linear chain of three branches
+# ---------------------------------------------------------------------------
+
+def test_branch_three_branch_linear_chain(repo: RepoTools):
+    """main → develop → feature — strict ancestry edges connect all three."""
+    repo.write("a.txt")
+    repo.commit("on-main")
+    repo.checkout("develop", new=True)
+    repo.write("b.txt")
+    repo.commit("on-develop")
+    repo.checkout("feature", new=True)
+    repo.write("c.txt")
+    repo.commit("on-feature")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # develop is ahead of main → edge main → develop
+    assert edge_in(src, "main", "develop"), "main must be parent of develop"
+    # feature is ahead of develop → edge develop → feature
+    assert edge_in(src, "develop", "feature"), "develop must be parent of feature"
+
+
+# ---------------------------------------------------------------------------
+# Branch mode: fork commit node
+# ---------------------------------------------------------------------------
+
+def test_branch_fork_sha_appears(repo: RepoTools):
+    """The fork commit's SHA prefix appears in the DOT source as a node label."""
+    repo.write("base.txt")
+    fork_sha = repo.commit("shared-base")
+
+    repo.checkout("side-a", new=True)
+    repo.write("a.txt")
+    repo.commit("a-work")
+
+    repo.checkout("main")
+    repo.write("b.txt")
+    repo.commit("b-work")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # The fork commit's 8-char short SHA must appear as a node label
+    assert fork_sha[:8] in src, f"Fork SHA {fork_sha[:8]} not found in branch diagram"
+
+
+def test_branch_fork_connects_both_branches(repo: RepoTools):
+    """Both diverged branches have edges to/from the shared fork commit."""
+    repo.write("base.txt")
+    repo.commit("shared-base")
+
+    repo.checkout("branch-a", new=True)
+    repo.write("a.txt")
+    repo.commit("a-work")
+
+    repo.checkout("main")
+    repo.write("b.txt")
+    repo.commit("b-work")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    assert node_in(src, "main")
+    assert node_in(src, "branch-a")
+    # Both branches must be reachable from the fork (directly or via fork node)
+    has_connection = (
+        edge_in(src, "main", "branch-a")
+        or edge_in(src, "branch-a", "main")
+        or "fork" in src
+    )
+    assert has_connection
+
+
+# ---------------------------------------------------------------------------
+# Normal mode: two refs on same commit
+# ---------------------------------------------------------------------------
+
+def test_normal_two_branches_same_commit_both_refs_visible(repo: RepoTools):
+    """Two branch refs at the same SHA both appear as ref nodes in normal mode."""
+    repo.write("a.txt")
+    sha = repo.commit("base")
+    repo.checkout("release", new=True)
+    repo.checkout("main")
+    # Both main and release point to sha
+
+    dg, _, _, _ = _build(str(repo.path))
+    src = dg.source
+    assert node_in(src, "refs/heads/main")
+    assert node_in(src, "refs/heads/release")
+    # The shared commit must still appear
+    assert node_in(src, sha)
+
+
+def test_normal_empty_repo_no_crash(repo: RepoTools):
+    """Empty repo (no commits) renders without error and without commit nodes."""
+    dg, _, graph, _ = _build(str(repo.path))
+    assert graph.commits == {}
+    # Should not crash; source is a valid (possibly empty-graph) string
+    assert isinstance(dg.source, str)
+
+
+# ---------------------------------------------------------------------------
+# Verbose mode: commit → tree → blob chain
+# ---------------------------------------------------------------------------
+
+def test_verbose_commit_to_tree_edge(repo: RepoTools):
+    """In verbose mode an edge from the commit SHA to its root tree SHA must exist."""
+    repo.write("file.txt", content="hello")
+    sha = repo.commit("first")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    cd = graph.commits[sha]
+    assert cd.tree_hexsha is not None
+    assert edge_in(src, sha, cd.tree_hexsha), (
+        f"Expected edge {sha[:8]} → {cd.tree_hexsha[:8]} in verbose mode"
+    )
+
+
+def test_verbose_tree_to_blob_edge(repo: RepoTools):
+    """In verbose mode an edge from the root tree SHA to each blob SHA must exist."""
+    repo.write("file.txt", content="hello")
+    sha = repo.commit("first")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    cd = graph.commits[sha]
+    td = graph.trees[cd.tree_hexsha]
+    assert td.blob_hexshas, "Expected at least one blob in the root tree"
+    for blob_sha in td.blob_hexshas:
+        assert edge_in(src, cd.tree_hexsha, blob_sha), (
+            f"Expected tree→blob edge {cd.tree_hexsha[:8]} → {blob_sha[:8]}"
+        )
+
+
+def test_verbose_nested_tree(repo: RepoTools):
+    """A subdirectory produces a child tree node connected to the root tree."""
+    repo.write("subdir/nested.txt", content="nested")
+    sha = repo.commit("nested")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    cd = graph.commits[sha]
+    root_td = graph.trees[cd.tree_hexsha]
+    assert root_td.child_tree_hexshas, "Expected at least one child tree (the subdir)"
+    for child_sha in root_td.child_tree_hexshas:
+        assert node_in(src, child_sha), f"Child tree {child_sha[:8]} missing from verbose diagram"
+        assert edge_in(src, cd.tree_hexsha, child_sha), (
+            f"Expected root-tree→child-tree edge"
+        )

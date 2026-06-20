@@ -68,7 +68,7 @@ class GraphBuilder:
             return dg
 
         if self.mode == "branch":
-            self._build_branch(dg, branch_topology or BranchTopology([], [], None, None))
+            self._build_branch(dg, branch_topology or BranchTopology([], [], [], None, None))
         else:
             self._build_commits(dg, graph)
             if self.mode == "verbose" and index_state:
