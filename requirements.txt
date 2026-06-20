@@ -1,5 +1,6 @@
 graphviz
 gitpython
+git
 pylint
 pep8
 watchdog
