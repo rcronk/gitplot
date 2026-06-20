@@ -20,9 +20,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         prog="gitplot",
         description="Generate Graphviz visualizations of git repository structure.",
     )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "--repo-path",
         default=".",
@@ -45,13 +43,19 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--output-format",
         default="svg",
         metavar="FORMAT",
-        help="Output format passed to Graphviz: svg, pdf, png, … (default: svg).",
+        help=(
+            "Output format: svg, pdf, png (Graphviz), or mermaid "
+            "(writes a Mermaid flowchart .md file). (default: svg)"
+        ),
     )
     parser.add_argument(
         "--output-path",
-        default="gitplot.svg",
+        default=None,
         metavar="PATH",
-        help="Where to write the output file (default: ./gitplot.svg).",
+        help=(
+            "Where to write the output file. "
+            "Defaults to gitplot.svg (or gitplot.md for --output-format mermaid)."
+        ),
     )
     parser.add_argument(
         "--rank-direction",
@@ -128,7 +132,9 @@ def _render_once(
     )
 
     index_state = repo.get_index_state() if args.mode == "verbose" else None
-    branch_topology = repo.get_branch_topology(args.exclude_remotes) if args.mode == "branch" else None
+    branch_topology = (
+        repo.get_branch_topology(args.exclude_remotes) if args.mode == "branch" else None
+    )
 
     # Branch mode flows forward in time left→right; commit modes flow right→left.
     if args.rank_direction is not None:
@@ -147,7 +153,7 @@ def _render_once(
     )
     dg = builder.build(graph, index_state=index_state, branch_topology=branch_topology)
 
-    out_path = renderer.render(dg)
+    renderer.render(dg)
     return builder.node_ids
 
 
@@ -159,6 +165,9 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     logging.info("gitplot %s", __version__)
     logging.info("mode=%s repo=%s", args.mode, args.repo_path)
+
+    if args.output_path is None:
+        args.output_path = "gitplot.md" if args.output_format == "mermaid" else "gitplot.svg"
 
     viewer = "none" if args.no_open else args.viewer
     renderer = Renderer(

@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class NodeColors:
-    line: str   # HSV string for border/line
-    fill: str   # HSV string for fill
+    line: str  # HSV string for border/line
+    fill: str  # HSV string for fill
 
 
 # Object types in display order; hues are evenly spaced around the HSV wheel.
@@ -23,10 +23,10 @@ _TYPES = [
     "new_node",
 ]
 
-_HIGHLIGHT_HUE = 0.15   # golden yellow for newly added nodes
+_HIGHLIGHT_HUE = 0.15  # golden yellow for newly added nodes
 
 SCHEME: dict[str, NodeColors] = {}
-_step = 1.0 / (len(_TYPES) - 1)   # reserve last slot for highlight
+_step = 1.0 / (len(_TYPES) - 1)  # reserve last slot for highlight
 for _i, _t in enumerate(_TYPES[:-1]):
     _hue = _i * _step
     SCHEME[_t] = NodeColors(

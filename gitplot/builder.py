@@ -13,7 +13,6 @@ import graphviz
 from .colors import SCHEME, NodeColors
 from .repo import (
     BranchTopology,
-    CommitData,
     IndexState,
     RepoGraph,
 )
@@ -60,7 +59,8 @@ class GraphBuilder:
         index_state: Optional[IndexState] = None,
         branch_topology: Optional[BranchTopology] = None,
     ) -> graphviz.Digraph:
-        dg = graphviz.Digraph(format=self.output_format, engine="dot")
+        gv_format = "svg" if self.output_format == "mermaid" else self.output_format
+        dg = graphviz.Digraph(format=gv_format, engine="dot")
         dg.graph_attr["rankdir"] = self.rank_direction
 
         if not graph.commits and not branch_topology:
@@ -109,11 +109,7 @@ class GraphBuilder:
             else:
                 type_key = "tag" if ref.is_tag else "ref"
                 self._add_node(dg, ref_id, label=ref.name, type_key=type_key)
-                edge_label = (
-                    "branch" if ref.is_branch
-                    else "tag" if ref.is_tag
-                    else "remote"
-                )
+                edge_label = "branch" if ref.is_branch else "tag" if ref.is_tag else "remote"
                 self._add_edge(dg, ref_id, ref.commit_hexsha, label=edge_label)
 
             self._walk_chain(dg, graph, ref.commit_hexsha, rendered_commits, hl)
@@ -127,7 +123,7 @@ class GraphBuilder:
         hl: int,
     ) -> None:
         """Walk the first-parent chain, collapsing boring runs in normal mode."""
-        collapse = (self.mode == "normal")
+        collapse = self.mode == "normal"
         obj_hexsha: Optional[str] = start_hexsha
         boring_run: list[str] = []
 
@@ -247,14 +243,11 @@ class GraphBuilder:
     # Index / working tree (verbose mode only)
     # ------------------------------------------------------------------
 
-    def _build_index(
-        self, dg: graphviz.Digraph, graph: RepoGraph, index_state: IndexState
-    ) -> None:
+    def _build_index(self, dg: graphviz.Digraph, graph: RepoGraph, index_state: IndexState) -> None:
         hl = graph.hash_length
 
         if index_state.staged:
-            self._add_node(dg, "Staged Changes", label="Staged Changes",
-                           type_key="staged_changes")
+            self._add_node(dg, "Staged Changes", label="Staged Changes", type_key="staged_changes")
             for sf in index_state.staged:
                 node_id = f"staged:{sf.path}"
                 label = f"{sf.path}\n{sf.hexsha[:hl]}"
@@ -262,8 +255,9 @@ class GraphBuilder:
                 self._add_edge(dg, "Staged Changes", node_id, label=sf.path)
 
         if index_state.unstaged:
-            self._add_node(dg, "Unstaged Changes", label="Unstaged Changes",
-                           type_key="unstaged_changes")
+            self._add_node(
+                dg, "Unstaged Changes", label="Unstaged Changes", type_key="unstaged_changes"
+            )
             for uf in index_state.unstaged:
                 node_id = f"unstaged:{uf.path}"
                 label = f"{uf.path}\n{uf.workspace_hexsha[:hl]}"
@@ -271,8 +265,7 @@ class GraphBuilder:
                 self._add_edge(dg, "Unstaged Changes", node_id, label=uf.path)
 
         if index_state.untracked:
-            self._add_node(dg, "Untracked", label="Untracked",
-                           type_key="untracked_file")
+            self._add_node(dg, "Untracked", label="Untracked", type_key="untracked_file")
             for path in index_state.untracked:
                 node_id = f"untracked:{path}"
                 self._add_node(dg, node_id, label=path, type_key="untracked_file")
@@ -303,7 +296,7 @@ class GraphBuilder:
             self._add_node(dg, "HEAD", label="HEAD (detached)", type_key="ref")
 
         for edge in topo.edges:
-            self._add_edge(dg, edge.from_id, edge.to_name, label="")
+            self._add_edge(dg, edge.from_id, edge.to_id, label="")
 
     # ------------------------------------------------------------------
     # Low-level node/edge helpers
@@ -322,9 +315,7 @@ class GraphBuilder:
             return SCHEME["new_node"]
         return SCHEME.get(type_key, SCHEME["commit"])
 
-    def _add_node(
-        self, dg: graphviz.Digraph, node_id: str, label: str, type_key: str
-    ) -> None:
+    def _add_node(self, dg: graphviz.Digraph, node_id: str, label: str, type_key: str) -> None:
         if node_id in self._rendered_nodes:
             return
         self._rendered_nodes.add(node_id)
@@ -338,9 +329,7 @@ class GraphBuilder:
             penwidth="2",
         )
 
-    def _add_edge(
-        self, dg: graphviz.Digraph, from_id: str, to_id: str, label: str = ""
-    ) -> None:
+    def _add_edge(self, dg: graphviz.Digraph, from_id: str, to_id: str, label: str = "") -> None:
         key = (from_id, to_id)
         if key in self._rendered_edges:
             return
