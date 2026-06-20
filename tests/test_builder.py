@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+
 from gitplot.builder import GraphBuilder
 from gitplot.repo import (
     GitRepo,
@@ -655,3 +658,97 @@ def test_verbose_nested_tree(repo: RepoTools):
     for child_sha in root_td.child_tree_hexshas:
         assert node_in(src, child_sha), f"Child tree {child_sha[:8]} missing from verbose diagram"
         assert edge_in(src, cd.tree_hexsha, child_sha), "Expected root-tree→child-tree edge"
+
+
+# ---------------------------------------------------------------------------
+# Shallow clone support (issue #6)
+# ---------------------------------------------------------------------------
+
+
+def _make_source_repo(path: Path, num_commits: int = 3) -> None:
+    """Create a plain git repo with num_commits commits; used as a clone source."""
+    path.mkdir()
+    for cmd in [
+        ["git", "init", "-b", "main"],
+        ["git", "config", "user.email", "test@gitplot.test"],
+        ["git", "config", "user.name", "GitPlot Test"],
+    ]:
+        subprocess.check_call(cmd, cwd=path, stderr=subprocess.DEVNULL)
+    for i in range(num_commits):
+        (path / f"f{i}.txt").write_text(str(i))
+        subprocess.check_call(["git", "add", "-A"], cwd=path, stderr=subprocess.DEVNULL)
+        subprocess.check_call(
+            ["git", "commit", "-m", f"commit {i}"], cwd=path, stderr=subprocess.DEVNULL
+        )
+
+
+def test_shallow_clone_normal_mode_no_crash(tmp_path: Path):
+    """Normal mode on a depth-1 shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, graph, _ = _build(str(shallow), mode="normal")
+    assert dg.source  # non-empty, valid DOT
+    # Only commits reachable within the shallow depth should be in the graph.
+    assert len(graph.commits) >= 1
+    assert len(graph.commits) <= 2  # depth=1 → at most tip commit visible
+
+
+def test_shallow_clone_shows_tip_commit(tmp_path: Path):
+    """The tip commit is visible; parents beyond the shallow depth are not."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    _, _, graph, _ = _build(str(shallow), mode="normal")
+    # Exactly 1 commit accessible in a depth-1 clone
+    assert len(graph.commits) == 1
+    # That commit has no parents recorded (shallow boundary)
+    only = next(iter(graph.commits.values()))
+    assert only.parents == []
+
+
+def test_shallow_clone_depth2_shows_two_commits(tmp_path: Path):
+    """depth=2 shallow clone exposes exactly 2 commits in the graph."""
+    _make_source_repo(tmp_path / "src", num_commits=4)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=2", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    _, _, graph, _ = _build(str(shallow), mode="normal")
+    assert len(graph.commits) == 2
+
+
+def test_shallow_clone_verbose_mode_no_crash(tmp_path: Path):
+    """Verbose mode (trees + blobs) on a shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, _, _ = _build(str(shallow), mode="verbose")
+    assert dg.source
+
+
+def test_shallow_clone_branch_mode_no_crash(tmp_path: Path):
+    """Branch mode on a shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, _, _ = _build(str(shallow), mode="branch")
+    assert dg.source

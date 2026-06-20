@@ -441,30 +441,64 @@ class GitRepo:
 
         while queue:
             commit_obj, depth = queue.popleft()
-            hexsha = commit_obj.hexsha
+            try:
+                hexsha = commit_obj.hexsha
+            except Exception:
+                continue
             if hexsha in visited:
                 continue
             visited.add(hexsha)
 
-            parent_hexshas = [p.hexsha for p in commit_obj.parents]
-            msg = (commit_obj.message or "").split("\n")[0][:72]
+            # Collect parents; may fail for shallow-clone boundary commits whose
+            # parent objects are not present in the local object store.
+            accessible_parents: list[git.Commit] = []
+            parent_hexshas: list[str] = []
+            try:
+                for p in commit_obj.parents:
+                    try:
+                        parent_hexshas.append(p.hexsha)
+                        accessible_parents.append(p)
+                    except Exception:
+                        pass
+            except Exception as exc:
+                log.debug("Cannot read parents of %s (shallow boundary?): %s", hexsha[:8], exc)
+
+            try:
+                msg = (commit_obj.message or "").split("\n")[0][:72]
+                author = commit_obj.author.name
+                date_iso = commit_obj.authored_datetime.isoformat()
+            except Exception as exc:
+                # Commit object not in the local store — shallow clone boundary.
+                # Skip it entirely so we don't produce empty/phantom nodes.
+                log.debug("Commit %s is inaccessible (shallow boundary): %s", hexsha[:8], exc)
+                continue
+
+            tree_hexsha: Optional[str] = None
+            if include_trees:
+                try:
+                    tree_hexsha = commit_obj.tree.hexsha
+                    self._collect_tree(commit_obj.tree, hexsha, trees, blobs)
+                except Exception as exc:
+                    log.debug("Cannot access tree for %s: %s", hexsha[:8], exc)
 
             commits[hexsha] = CommitData(
                 hexsha=hexsha,
                 parents=parent_hexshas,
                 short_message=msg,
-                author=commit_obj.author.name,
-                date_iso=commit_obj.authored_datetime.isoformat(),
-                tree_hexsha=commit_obj.tree.hexsha if include_trees else None,
+                author=author,
+                date_iso=date_iso,
+                tree_hexsha=tree_hexsha,
             )
 
-            if include_trees:
-                self._collect_tree(commit_obj.tree, hexsha, trees, blobs)
-
             if max_depth is None or depth < max_depth:
-                for parent in commit_obj.parents:
+                for parent in accessible_parents:
                     if parent.hexsha not in visited:
                         queue.append((parent, depth + 1))
+
+        # Strip parent SHAs that aren't in commits — happens at shallow-clone
+        # boundaries and at max_depth cut-offs so we don't produce dangling edges.
+        for cd in commits.values():
+            cd.parents = [p for p in cd.parents if p in commits]
 
         return commits, trees, blobs
 
