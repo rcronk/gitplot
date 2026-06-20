@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-
 from gitplot.repo import GitRepo
 
 from .conftest import RepoTools
 
-
 # ---------------------------------------------------------------------------
 # Validity
 # ---------------------------------------------------------------------------
+
 
 def test_nonexistent_path():
     r = GitRepo("/this/does/not/exist/at/all")
@@ -32,6 +30,7 @@ def test_empty_repo(repo: RepoTools):
 # ---------------------------------------------------------------------------
 # Commit traversal
 # ---------------------------------------------------------------------------
+
 
 def test_single_commit(repo: RepoTools):
     repo.write("a.txt")
@@ -61,7 +60,7 @@ def test_linear_chain(repo: RepoTools):
 
 def test_merge_commit(repo: RepoTools):
     repo.write("base.txt")
-    base = repo.commit("base")
+    repo.commit("base")
 
     repo.checkout("feature", new=True)
     repo.write("feature.txt")
@@ -157,9 +156,10 @@ def test_hash_length_scales(repo: RepoTools):
 # Tags
 # ---------------------------------------------------------------------------
 
+
 def test_lightweight_tag(repo: RepoTools):
     repo.write("a.txt")
-    sha = repo.commit("first")
+    repo.commit("first")
     repo.tag("v1.0")
     graph = GitRepo(str(repo.path)).build_graph()
     tag_refs = [r for r in graph.refs if r.is_tag]
@@ -181,6 +181,7 @@ def test_annotated_tag(repo: RepoTools):
 # ---------------------------------------------------------------------------
 # Index state
 # ---------------------------------------------------------------------------
+
 
 def test_index_staged(repo: RepoTools):
     repo.write("a.txt")
@@ -208,7 +209,7 @@ def test_index_unstaged(repo: RepoTools):
 def test_index_untracked(repo: RepoTools):
     repo.write("a.txt")
     repo.commit("first")
-    repo.write("untracked.txt")   # not staged
+    repo.write("untracked.txt")  # not staged
 
     idx = GitRepo(str(repo.path)).get_index_state()
     assert "untracked.txt" in idx.untracked
@@ -217,6 +218,7 @@ def test_index_untracked(repo: RepoTools):
 # ---------------------------------------------------------------------------
 # Trees and blobs (verbose mode)
 # ---------------------------------------------------------------------------
+
 
 def test_verbose_includes_trees(repo: RepoTools):
     repo.write("a.txt")
@@ -229,7 +231,7 @@ def test_verbose_includes_trees(repo: RepoTools):
 
 def test_verbose_includes_blobs(repo: RepoTools):
     repo.write("a.txt", content="hello")
-    sha = repo.commit("first")
+    repo.commit("first")
     graph = GitRepo(str(repo.path)).build_graph(include_trees=True)
     # At least one blob should exist
     assert len(graph.blobs) > 0
