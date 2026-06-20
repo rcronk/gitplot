@@ -193,7 +193,7 @@ class GitRepo:
         except Exception:
             head_branch_path = None
 
-        refs = self._collect_refs(exclude_remotes)
+        refs = self._collect_refs(exclude_remotes, include_stash=include_trees)
         if not refs:
             return RepoGraph(
                 commits={},
@@ -324,6 +324,19 @@ class GitRepo:
             except Exception:
                 pass
 
+        for sha, label in self._collect_stash_entries():
+            try:
+                repo.commit(sha)
+                nodes.append(
+                    BranchNode(
+                        name=label,
+                        path=f"refs/stash/{label}",
+                        commit_hexsha=sha,
+                    )
+                )
+            except Exception:
+                pass
+
         fork_commits, edges = self._compute_branch_topology(nodes)
         return BranchTopology(
             nodes=nodes,
@@ -337,7 +350,27 @@ class GitRepo:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _collect_refs(self, exclude_remotes: bool) -> list[RefInfo]:
+    def _collect_stash_entries(self) -> list[tuple[str, str]]:
+        """Return [(sha, 'stash@{N}'), ...] newest-first from the stash reflog."""
+        import os
+
+        reflog_path = os.path.join(self._repo.git_dir, "logs", "refs", "stash")
+        try:
+            with open(reflog_path) as fh:
+                lines = [ln for ln in fh.read().splitlines() if ln.strip()]
+        except OSError:
+            return []
+        entries = []
+        for i, line in enumerate(reversed(lines)):
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            sha = parts[1]
+            if len(sha) >= 40 and all(c in "0123456789abcdefABCDEF" for c in sha):
+                entries.append((sha, f"stash@{{{i}}}"))
+        return entries
+
+    def _collect_refs(self, exclude_remotes: bool, include_stash: bool = False) -> list[RefInfo]:
         """Return refs in traversal order: HEAD, branches, tags, remotes."""
         repo = self._repo
         refs: list[RefInfo] = []
@@ -412,6 +445,23 @@ class GitRepo:
                             pass
             except Exception:
                 pass
+
+        if include_stash:
+            for sha, label in self._collect_stash_entries():
+                path = f"stash/{label}"
+                if path not in seen:
+                    seen.add(path)
+                    try:
+                        repo.commit(sha)
+                        refs.append(
+                            RefInfo(
+                                path=path,
+                                name=label,
+                                commit_hexsha=sha,
+                            )
+                        )
+                    except Exception:
+                        pass
 
         return refs
 

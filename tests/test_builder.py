@@ -661,6 +661,98 @@ def test_verbose_nested_tree(repo: RepoTools):
 
 
 # ---------------------------------------------------------------------------
+# Stash support (issue #7)
+# ---------------------------------------------------------------------------
+
+
+def test_stash_absent_no_crash_branch_mode(repo: RepoTools):
+    """No stash entries → no crash, no stash nodes in branch mode."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert "stash" not in dg.source.lower()
+
+
+def test_stash_absent_no_crash_verbose_mode(repo: RepoTools):
+    """No stash entries → no crash in verbose mode."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    assert isinstance(dg.source, str)
+
+
+def test_stash_node_appears_in_branch_mode(repo: RepoTools):
+    """A stash entry appears as a labeled node in branch mode."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("a.txt", content="modified")
+    repo._run(["git", "stash"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert "stash" in dg.source.lower()
+
+
+def test_stash_branch_mode_connected_to_parent_branch(repo: RepoTools):
+    """Stash node is connected to the branch it was stashed from."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("a.txt", content="modified")
+    repo._run(["git", "stash"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # Stash appears and so does main; they must be connected
+    assert "stash" in src.lower()
+    assert node_in(src, "main")
+    has_connection = (
+        edge_in(src, "main", "stash@{0}")
+        or edge_in(src, "stash@{0}", "main")
+        or ("stash" in src.lower() and "main" in src)
+    )
+    assert has_connection
+
+
+def test_stash_verbose_mode_commit_in_graph(repo: RepoTools):
+    """Stash commit SHA is present in the verbose-mode commit graph."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("a.txt", content="modified")
+    repo._run(["git", "stash"])
+    stash_sha = repo._run(["git", "rev-parse", "stash@{0}"])
+
+    _, _, graph, _ = _build(str(repo.path), mode="verbose")
+    assert stash_sha in graph.commits
+
+
+def test_stash_not_shown_in_normal_mode(repo: RepoTools):
+    """Stash does not appear in normal mode (branch/verbose only)."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("a.txt", content="modified")
+    repo._run(["git", "stash"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert "stash" not in dg.source.lower()
+
+
+def test_stash_multiple_entries_all_in_branch_mode(repo: RepoTools):
+    """Multiple stash entries all appear in branch mode."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("a.txt", content="mod1")
+    repo._run(["git", "stash"])
+    repo.write("a.txt", content="mod2")
+    repo._run(["git", "stash"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # Both stash entries must be referenced
+    assert "stash@{0}" in src and "stash@{1}" in src
+
+
+# ---------------------------------------------------------------------------
 # Shallow clone support (issue #6)
 # ---------------------------------------------------------------------------
 
