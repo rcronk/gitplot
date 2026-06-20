@@ -256,17 +256,62 @@ def test_branch_mode_nodes(repo: RepoTools):
 
 
 def test_branch_mode_ancestry_edge(repo: RepoTools):
-    """dev was created from main → edge from main to dev in topology."""
+    """dev was created from main → main and dev connect via a fork commit node."""
     repo.write("a.txt")
-    repo.commit("base")
+    main_sha = repo.commit("base")
     repo.checkout("dev", new=True)
     repo.write("b.txt")
     repo.commit("dev-work")
     repo.checkout("main")
 
     dg, _, _, _ = _build(str(repo.path), mode="branch")
-    # main's tip is an ancestor of dev → edge main → dev
-    assert edge_in(dg.source, "main", "dev")
+    src = dg.source
+    # main's tip is the fork point: main → [main_sha] → dev
+    assert edge_in(src, "main", main_sha), "main must connect to its tip commit as fork node"
+    assert edge_in(src, main_sha, "dev"), "fork commit must connect to dev"
+
+
+def test_branch_strict_ancestor_inserts_fork_node(repo: RepoTools):
+    """Strict ancestry must insert a fork commit node, not a direct branch-to-branch edge."""
+    repo.write("a.txt")
+    main_sha = repo.commit("base")
+    repo.checkout("dev", new=True)
+    repo.write("b.txt")
+    repo.commit("dev-work")
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # A fork commit node (main's tip) must appear in the source
+    assert main_sha[:8] in src, "Fork commit's short SHA must appear as a node label"
+    # There must be no direct main → dev edge (fork commit must be the intermediary)
+    assert not edge_in(src, "main", "dev"), "Direct branch-to-branch edge must not exist"
+
+
+def test_branch_strict_ancestor_ancestor_to_fork_edge(repo: RepoTools):
+    """The ancestor branch has an edge pointing to the fork commit at its own tip."""
+    repo.write("a.txt")
+    main_sha = repo.commit("base")
+    repo.checkout("dev", new=True)
+    repo.write("b.txt")
+    repo.commit("dev-work")
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert edge_in(dg.source, "main", main_sha)
+
+
+def test_branch_strict_ancestor_fork_to_child_edge(repo: RepoTools):
+    """The fork commit node has an edge pointing to the descendant branch."""
+    repo.write("a.txt")
+    main_sha = repo.commit("base")
+    repo.checkout("dev", new=True)
+    repo.write("b.txt")
+    repo.commit("dev-work")
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert edge_in(dg.source, main_sha, "dev")
 
 
 def test_branch_mode_single_branch(repo: RepoTools):
@@ -381,22 +426,24 @@ def test_branch_ff_merge_stays_connected(repo: RepoTools):
 
 
 def test_branch_three_branch_linear_chain(repo: RepoTools):
-    """main → develop → feature — strict ancestry edges connect all three."""
+    """main → develop → feature — each branch connects to its tip as a fork commit node."""
     repo.write("a.txt")
-    repo.commit("on-main")
+    main_sha = repo.commit("on-main")
     repo.checkout("develop", new=True)
     repo.write("b.txt")
-    repo.commit("on-develop")
+    develop_sha = repo.commit("on-develop")
     repo.checkout("feature", new=True)
     repo.write("c.txt")
     repo.commit("on-feature")
 
     dg, _, _, _ = _build(str(repo.path), mode="branch")
     src = dg.source
-    # develop is ahead of main → edge main → develop
-    assert edge_in(src, "main", "develop"), "main must be parent of develop"
-    # feature is ahead of develop → edge develop → feature
-    assert edge_in(src, "develop", "feature"), "develop must be parent of feature"
+    # main connects to its fork commit, which connects to develop
+    assert edge_in(src, "main", main_sha), "main must connect to its fork commit"
+    assert edge_in(src, main_sha, "develop"), "main's fork commit must connect to develop"
+    # develop connects to its fork commit, which connects to feature
+    assert edge_in(src, "develop", develop_sha), "develop must connect to its fork commit"
+    assert edge_in(src, develop_sha, "feature"), "develop's fork commit must connect to feature"
 
 
 # ---------------------------------------------------------------------------

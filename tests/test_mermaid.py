@@ -225,6 +225,28 @@ def test_mermaid_integration_branch_mode(repo: RepoTools):
     assert "main" in out
 
 
+def test_mermaid_branch_mode_fork_node_is_labeled(repo: RepoTools):
+    """Fork commit nodes (multi-line DOT labels) must appear as labeled Mermaid nodes.
+
+    graphviz puts a literal newline inside the label string when the label contains \\n.
+    The Mermaid converter must handle this so fork nodes get a proper node declaration
+    instead of appearing only as bare hexshas in edge lines.
+    """
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("dev", new=True)
+    repo.write("b.txt")
+    repo.commit("dev-work")
+    repo.checkout("main")
+
+    out = _build_mermaid(repo, mode="branch")
+    node_def_lines = [ln.strip() for ln in out.splitlines() if '["' in ln and "-->" not in ln]
+    assert any("fork" in ln for ln in node_def_lines), (
+        "Fork commit nodes must appear as labeled Mermaid nodes (with 'fork' in the label), "
+        "not as bare hexshas embedded only in edge lines"
+    )
+
+
 def test_builder_accepts_mermaid_output_format(repo: RepoTools):
     """GraphBuilder.build() must not raise when output_format='mermaid'.
 

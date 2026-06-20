@@ -15,6 +15,7 @@ def dot_to_mermaid(dot_source: str) -> str:
     Mermaid-unsafe characters (/, @, {, }) are sanitised; display labels
     and colours are preserved verbatim.
     """
+    dot_source = _escape_string_newlines(dot_source)
     lines = dot_source.strip().splitlines()
 
     rankdir = "LR"
@@ -86,16 +87,45 @@ def _extract_label(attrs: str, fallback: str) -> str:
     graphviz quotes label values when they contain spaces or special
     characters but leaves them unquoted when they are plain identifiers
     (e.g. a short hex hash like ``a160d``).  Both forms are handled.
+    After _escape_string_newlines() preprocessing, \\n escape sequences
+    inside labels are converted to <br/> for Mermaid line-break display.
     """
     # Quoted: label="some text"
     m = re.search(r'label="((?:[^"\\]|\\.)*)"', attrs)
     if m:
-        return m.group(1)
+        return m.group(1).replace("\\n", "<br/>")
     # Unquoted: label=abc123  (stops at first whitespace or comma)
     m = re.search(r"\blabel=([^\s,\]]+)", attrs)
     if m:
         return m.group(1)
     return fallback
+
+
+def _escape_string_newlines(source: str) -> str:
+    """Replace literal newlines inside DOT quoted strings with \\n escape sequences.
+
+    graphviz emits multi-line labels as literal newlines inside quoted strings,
+    which breaks line-by-line parsing.  This preprocessor collapses them so
+    each node/edge declaration fits on a single logical line.
+    """
+    result: list[str] = []
+    in_string = False
+    i = 0
+    while i < len(source):
+        c = source[i]
+        if c == "\\" and i + 1 < len(source):
+            result.append(c)
+            result.append(source[i + 1])
+            i += 2
+            continue
+        if c == '"':
+            in_string = not in_string
+        if in_string and c == "\n":
+            result.append("\\n")
+        else:
+            result.append(c)
+        i += 1
+    return "".join(result)
 
 
 def _extract_style(attrs: str, safe_id: str) -> str:

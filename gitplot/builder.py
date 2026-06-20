@@ -296,7 +296,7 @@ class GraphBuilder:
             self._add_node(dg, "HEAD", label="HEAD (detached)", type_key="ref")
 
         for edge in topo.edges:
-            self._add_edge(dg, edge.from_id, edge.to_name, label="")
+            self._add_edge(dg, edge.from_id, edge.to_id, label="")
 
     # ------------------------------------------------------------------
     # Low-level node/edge helpers
