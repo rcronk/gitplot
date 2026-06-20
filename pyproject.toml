@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "gitplot"
 version = "0.2.0"
 description = "Graphviz visualizations of git repository structure"
-readme = "readme.rst"
+readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Robert Cronk", email = "cronk.r@gmail.com" }]
 requires-python = ">=3.9"
