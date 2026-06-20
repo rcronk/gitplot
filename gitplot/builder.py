@@ -59,7 +59,8 @@ class GraphBuilder:
         index_state: Optional[IndexState] = None,
         branch_topology: Optional[BranchTopology] = None,
     ) -> graphviz.Digraph:
-        dg = graphviz.Digraph(format=self.output_format, engine="dot")
+        gv_format = "svg" if self.output_format == "mermaid" else self.output_format
+        dg = graphviz.Digraph(format=gv_format, engine="dot")
         dg.graph_attr["rankdir"] = self.rank_direction
 
         if not graph.commits and not branch_topology:
@@ -295,7 +296,7 @@ class GraphBuilder:
             self._add_node(dg, "HEAD", label="HEAD (detached)", type_key="ref")
 
         for edge in topo.edges:
-            self._add_edge(dg, edge.from_id, edge.to_name, label="")
+            self._add_edge(dg, edge.from_id, edge.to_id, label="")
 
     # ------------------------------------------------------------------
     # Low-level node/edge helpers

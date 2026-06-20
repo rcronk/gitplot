@@ -34,6 +34,9 @@ class Renderer:
         out_path = self.output_path
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
+        if self.output_format == "mermaid":
+            return self._render_mermaid(dg, out_path)
+
         # graphviz.render writes <filename>.<format> when given a source file.
         # We write the DOT to a temp file, render, then move to the desired path.
         with tempfile.NamedTemporaryFile(suffix=".dot", delete=False) as tmp:
@@ -53,6 +56,14 @@ class Renderer:
         finally:
             tmp_dot.unlink(missing_ok=True)
 
+        log.info("Rendered %s", out_path)
+        return out_path
+
+    def _render_mermaid(self, dg: graphviz.Digraph, out_path: Path) -> Path:
+        from .mermaid import dot_to_mermaid
+
+        mermaid_text = dot_to_mermaid(dg.source)
+        out_path.write_text(mermaid_text, encoding="utf-8")
         log.info("Rendered %s", out_path)
         return out_path
 
