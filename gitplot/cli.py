@@ -55,9 +55,13 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--rank-direction",
-        default="RL",
+        default=None,
         choices=["RL", "LR", "TB", "BT"],
-        help="Graphviz rank direction (default: RL — newest commit on right).",
+        help=(
+            "Graphviz rank direction. "
+            "Default: LR for --mode branch (fork on left, tips on right); "
+            "RL for normal/verbose (newest commit on right)."
+        ),
     )
     parser.add_argument(
         "--max-commit-depth",
@@ -126,9 +130,17 @@ def _render_once(
     index_state = repo.get_index_state() if args.mode == "verbose" else None
     branch_topology = repo.get_branch_topology(args.exclude_remotes) if args.mode == "branch" else None
 
+    # Branch mode flows forward in time left→right; commit modes flow right→left.
+    if args.rank_direction is not None:
+        rank_direction = args.rank_direction
+    elif args.mode == "branch":
+        rank_direction = "LR"
+    else:
+        rank_direction = "RL"
+
     builder = GraphBuilder(
         mode=args.mode,
-        rank_direction=args.rank_direction,
+        rank_direction=rank_direction,
         output_format=args.output_format,
         commit_details=args.commit_details,
         highlight_ids=highlight_ids,
