@@ -294,12 +294,16 @@ class GraphBuilder:
                 label = f"HEAD→{node.name}"
             self._add_node(dg, node.name, label=label, type_key=type_key)
 
+        # Fork commit nodes — shown as commit-style nodes labelled with short hash
+        for fork in topo.fork_commits:
+            label = f"fork\n{fork.short_hexsha}"
+            self._add_node(dg, fork.hexsha, label=label, type_key="commit")
+
         if topo.head_commit:
-            # Detached HEAD: show as a separate node pointing to a commit hash
             self._add_node(dg, "HEAD", label="HEAD (detached)", type_key="ref")
 
         for edge in topo.edges:
-            self._add_edge(dg, edge.from_name, edge.to_name, label="")
+            self._add_edge(dg, edge.from_id, edge.to_name, label="")
 
     # ------------------------------------------------------------------
     # Low-level node/edge helpers

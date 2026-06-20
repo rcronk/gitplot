@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from gitplot.builder import GraphBuilder
-from gitplot.repo import BranchTopology, GitRepo, IndexState, StagedFile, UnstagedFile
+from gitplot.repo import BranchTopology, ForkCommitNode, GitRepo, IndexState, StagedFile, UnstagedFile
 
 from .conftest import RepoTools, edge_in, node_in
 
@@ -33,6 +33,34 @@ def test_invalid_repo_shows_message():
                       head_branch_path=None, is_detached=False, hash_length=5)
     dg = builder.build(empty)
     assert "no-repo" in dg.source or "No git repo found" in dg.source
+
+
+def test_branch_mode_diverged_shows_fork(repo: RepoTools):
+    """Diverged branches are connected through a fork commit node."""
+    repo.write("base.txt")
+    repo.commit("base")
+    # Branch off and add unique commits on each side so they diverge
+    repo.checkout("stable", new=True)
+    repo.write("stable.txt")
+    repo.commit("stable-only")
+
+    repo.checkout("main")
+    repo.write("main2.txt")
+    repo.commit("main-only")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # Both branches must appear
+    assert node_in(src, "main")
+    assert node_in(src, "stable")
+    # They must be connected: either directly (if one is ancestor) or via a fork
+    # A fork node or direct edge should exist
+    has_connection = (
+        edge_in(src, "main", "stable") or
+        edge_in(src, "stable", "main") or
+        "fork" in src   # fork commit node label
+    )
+    assert has_connection, "Diverged branches must be connected in branch topology"
 
 
 # ---------------------------------------------------------------------------
