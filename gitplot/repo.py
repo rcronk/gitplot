@@ -620,10 +620,35 @@ class GitRepo:
                 )
             )
 
-        # Add branch → fork edges for branches whose tip IS a fork commit
+        # Reverse lookup: fork_hexsha → child branch names (from parent_map)
+        fork_children: dict[str, list[str]] = {}
+        for child_name, (parent_id, _, _) in parent_map.items():
+            if parent_id in forks:
+                fork_children.setdefault(parent_id, []).append(child_name)
+
+        # Add branch ↔ fork edges for branches whose tip IS a fork commit.
+        # Direction depends on priority: if the branch is less "primary" than any
+        # existing child of the fork (higher _branch_priority number = less primary),
+        # show it as a sibling child of the fork rather than as the fork's parent.
+        # E.g. feature/rewrite (priority 2) ancestor of main (priority 0) →
+        #   fork → feature/rewrite  AND  fork → main  (both are children)
+        # But develop (priority 1) ancestor of feature/* (priority 2) →
+        #   develop → fork  (develop is the "primary" branch leading to the fork)
         for branch_name, fork_hexsha in branch_at_fork.items():
             if fork_hexsha in used_fork_hexshas:
-                edges.append(BranchEdge(from_id=branch_name, to_id=fork_hexsha, from_is_fork=False))
+                children = fork_children.get(fork_hexsha, [])
+                if children and _branch_priority(branch_name) > min(
+                    _branch_priority(c) for c in children
+                ):
+                    # Lower-priority branch: flip — fork points TO the branch
+                    edges.append(
+                        BranchEdge(from_id=fork_hexsha, to_id=branch_name, from_is_fork=True)
+                    )
+                else:
+                    # Higher-or-equal-priority branch: keep — branch leads TO fork
+                    edges.append(
+                        BranchEdge(from_id=branch_name, to_id=fork_hexsha, from_is_fork=False)
+                    )
             else:
                 # The branch's tip fork was superseded by a more-recent fork in
                 # parent_map (a closer divergence point overwrote it).  Find the

@@ -446,6 +446,45 @@ def test_branch_three_branch_linear_chain(repo: RepoTools):
     assert edge_in(src, develop_sha, "feature"), "develop's fork commit must connect to feature"
 
 
+def test_branch_low_priority_ancestor_shown_as_fork_child(repo: RepoTools):
+    """A lower-priority ancestor branch must appear as a child of the fork, not its parent.
+
+    When feature/old (priority 2) is a strict ancestor of main (priority 0),
+    the diagram must show both as children of the shared fork commit — NOT the
+    chain  feature/old → [fork] → main  which falsely implies feature/old is a
+    root that main descended from.
+
+    Expected:  [fork] → feature/old
+               [fork] → main
+    Rejected:  feature/old → [fork] → main
+    """
+    repo.write("a.txt")
+    repo.commit("base")
+    # oldbranch adds a commit; main will fast-forward to it so that
+    # oldbranch's tip becomes a shared ancestor of main.
+    repo.checkout("oldbranch", new=True)
+    repo.write("b.txt")
+    repo.commit("oldbranch-work")
+    repo.checkout("main")
+    repo.merge("oldbranch", no_ff=False)  # fast-forward: main now at oldbranch's tip
+    fork_sha = repo.rev_parse("HEAD")  # oldbranch's tip = main's current position
+    repo.write("c.txt")
+    repo.commit("main-continues")  # main moves ahead; oldbranch stays at fork_sha
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+
+    # fork_sha must connect TO oldbranch (oldbranch is a sibling of main at the fork)
+    assert edge_in(src, fork_sha, "oldbranch"), (
+        "Fork commit must connect to oldbranch — oldbranch should be a child of the "
+        "fork, not its parent"
+    )
+    # The wrong direction must not be present
+    assert not edge_in(src, "oldbranch", fork_sha), (
+        "oldbranch must not appear as the parent of the fork commit"
+    )
+
+
 def test_branch_ancestor_connected_through_intermediate_fork(repo: RepoTools):
     """main stays connected when a closer fork commit supersedes it as develop's parent.
 
