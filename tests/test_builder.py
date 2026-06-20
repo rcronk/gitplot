@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
+import subprocess
+from pathlib import Path
 
 from gitplot.builder import GraphBuilder
-from gitplot.repo import BranchTopology, ForkCommitNode, GitRepo, IndexState, StagedFile, UnstagedFile
+from gitplot.repo import (
+    GitRepo,
+)
 
 from .conftest import RepoTools, edge_in, node_in
 
@@ -26,11 +29,20 @@ def _build(repo_path, mode="normal", **kwargs):
 # No valid repo
 # ---------------------------------------------------------------------------
 
+
 def test_invalid_repo_shows_message():
     builder = GraphBuilder(mode="normal")
     from gitplot.repo import RepoGraph
-    empty = RepoGraph(commits={}, trees={}, blobs={}, refs=[],
-                      head_branch_path=None, is_detached=False, hash_length=5)
+
+    empty = RepoGraph(
+        commits={},
+        trees={},
+        blobs={},
+        refs=[],
+        head_branch_path=None,
+        is_detached=False,
+        hash_length=5,
+    )
     dg = builder.build(empty)
     assert "no-repo" in dg.source or "No git repo found" in dg.source
 
@@ -56,9 +68,9 @@ def test_branch_mode_diverged_shows_fork(repo: RepoTools):
     # They must be connected: either directly (if one is ancestor) or via a fork
     # A fork node or direct edge should exist
     has_connection = (
-        edge_in(src, "main", "stable") or
-        edge_in(src, "stable", "main") or
-        "fork" in src   # fork commit node label
+        edge_in(src, "main", "stable")
+        or edge_in(src, "stable", "main")
+        or "fork" in src  # fork commit node label
     )
     assert has_connection, "Diverged branches must be connected in branch topology"
 
@@ -66,6 +78,7 @@ def test_branch_mode_diverged_shows_fork(repo: RepoTools):
 # ---------------------------------------------------------------------------
 # Normal mode
 # ---------------------------------------------------------------------------
+
 
 def test_normal_mode_ref_node(repo: RepoTools):
     repo.write("a.txt")
@@ -116,7 +129,7 @@ def test_normal_mode_collapse_boring(repo: RepoTools):
     dg, builder, graph, _ = _build(str(repo.path))
     src = dg.source
     # The boring middle commits should be collapsed: look for the (N) pattern
-    assert "(" in src and ")" in src   # summary node label pattern
+    assert "(" in src and ")" in src  # summary node label pattern
 
 
 def test_normal_mode_merge_both_parents(repo: RepoTools):
@@ -152,7 +165,7 @@ def test_normal_mode_detached_head(repo: RepoTools):
 
 def test_normal_mode_lightweight_tag(repo: RepoTools):
     repo.write("a.txt")
-    sha = repo.commit("first")
+    repo.commit("first")
     repo.tag("v1.0")
     dg, _, _, _ = _build(str(repo.path))
     assert node_in(dg.source, "refs/tags/v1.0")
@@ -169,7 +182,7 @@ def test_normal_mode_annotated_tag(repo: RepoTools):
 
 def test_commit_details_flag(repo: RepoTools):
     repo.write("a.txt")
-    sha = repo.commit("my special message")
+    repo.commit("my special message")
     dg, _, _, _ = _build(str(repo.path), commit_details=True)
     assert "my special message" in dg.source
 
@@ -177,6 +190,7 @@ def test_commit_details_flag(repo: RepoTools):
 # ---------------------------------------------------------------------------
 # Verbose mode
 # ---------------------------------------------------------------------------
+
 
 def test_verbose_tree_nodes(repo: RepoTools):
     repo.write("a.txt", content="hello")
@@ -229,6 +243,7 @@ def test_verbose_untracked_file(repo: RepoTools):
 # Branch mode
 # ---------------------------------------------------------------------------
 
+
 def test_branch_mode_nodes(repo: RepoTools):
     repo.write("a.txt")
     repo.commit("base")
@@ -269,6 +284,7 @@ def test_branch_mode_single_branch(repo: RepoTools):
 # Highlight (new-node detection)
 # ---------------------------------------------------------------------------
 
+
 def test_highlight_ids_applied(repo: RepoTools):
     """Nodes in highlight_ids receive the new_node color style."""
     repo.write("a.txt")
@@ -289,6 +305,7 @@ def test_highlight_ids_applied(repo: RepoTools):
 # Node deduplication
 # ---------------------------------------------------------------------------
 
+
 def test_no_duplicate_nodes(repo: RepoTools):
     """Each commit appears only once even when reachable from multiple refs."""
     repo.write("a.txt")
@@ -301,12 +318,13 @@ def test_no_duplicate_nodes(repo: RepoTools):
     # Count occurrences of sha in source; should appear only once as a node def
     node_declarations = src.count(f'"{sha}"')
     # 1 node def + edges referencing it; node def itself appears at most a few times
-    assert node_declarations <= 3   # generous upper bound; duplication would be 10+
+    assert node_declarations <= 3  # generous upper bound; duplication would be 10+
 
 
 # ---------------------------------------------------------------------------
 # Branch mode: same-commit branches
 # ---------------------------------------------------------------------------
+
 
 def test_branch_same_commit_connected(repo: RepoTools):
     """Two branches at the same commit must be connected, not floating islands."""
@@ -364,6 +382,7 @@ def test_branch_ff_merge_stays_connected(repo: RepoTools):
 # Branch mode: linear chain of three branches
 # ---------------------------------------------------------------------------
 
+
 def test_branch_three_branch_linear_chain(repo: RepoTools):
     """main → develop → feature — strict ancestry edges connect all three."""
     repo.write("a.txt")
@@ -386,6 +405,7 @@ def test_branch_three_branch_linear_chain(repo: RepoTools):
 # ---------------------------------------------------------------------------
 # Branch mode: fork commit node
 # ---------------------------------------------------------------------------
+
 
 def test_branch_fork_sha_appears(repo: RepoTools):
     """The fork commit's SHA prefix appears in the DOT source as a node label."""
@@ -425,9 +445,7 @@ def test_branch_fork_connects_both_branches(repo: RepoTools):
     assert node_in(src, "branch-a")
     # Both branches must be reachable from the fork (directly or via fork node)
     has_connection = (
-        edge_in(src, "main", "branch-a")
-        or edge_in(src, "branch-a", "main")
-        or "fork" in src
+        edge_in(src, "main", "branch-a") or edge_in(src, "branch-a", "main") or "fork" in src
     )
     assert has_connection
 
@@ -435,6 +453,7 @@ def test_branch_fork_connects_both_branches(repo: RepoTools):
 # ---------------------------------------------------------------------------
 # Normal mode: two refs on same commit
 # ---------------------------------------------------------------------------
+
 
 def test_normal_two_branches_same_commit_both_refs_visible(repo: RepoTools):
     """Two branch refs at the same SHA both appear as ref nodes in normal mode."""
@@ -463,6 +482,7 @@ def test_normal_empty_repo_no_crash(repo: RepoTools):
 # ---------------------------------------------------------------------------
 # Verbose mode: commit → tree → blob chain
 # ---------------------------------------------------------------------------
+
 
 def test_verbose_commit_to_tree_edge(repo: RepoTools):
     """In verbose mode an edge from the commit SHA to its root tree SHA must exist."""
@@ -509,6 +529,98 @@ def test_verbose_nested_tree(repo: RepoTools):
     assert root_td.child_tree_hexshas, "Expected at least one child tree (the subdir)"
     for child_sha in root_td.child_tree_hexshas:
         assert node_in(src, child_sha), f"Child tree {child_sha[:8]} missing from verbose diagram"
-        assert edge_in(src, cd.tree_hexsha, child_sha), (
-            f"Expected root-tree→child-tree edge"
+        assert edge_in(src, cd.tree_hexsha, child_sha), "Expected root-tree→child-tree edge"
+
+
+# ---------------------------------------------------------------------------
+# Shallow clone support (issue #6)
+# ---------------------------------------------------------------------------
+
+
+def _make_source_repo(path: Path, num_commits: int = 3) -> None:
+    """Create a plain git repo with num_commits commits; used as a clone source."""
+    path.mkdir()
+    for cmd in [
+        ["git", "init", "-b", "main"],
+        ["git", "config", "user.email", "test@gitplot.test"],
+        ["git", "config", "user.name", "GitPlot Test"],
+    ]:
+        subprocess.check_call(cmd, cwd=path, stderr=subprocess.DEVNULL)
+    for i in range(num_commits):
+        (path / f"f{i}.txt").write_text(str(i))
+        subprocess.check_call(["git", "add", "-A"], cwd=path, stderr=subprocess.DEVNULL)
+        subprocess.check_call(
+            ["git", "commit", "-m", f"commit {i}"], cwd=path, stderr=subprocess.DEVNULL
         )
+
+
+def test_shallow_clone_normal_mode_no_crash(tmp_path: Path):
+    """Normal mode on a depth-1 shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, graph, _ = _build(str(shallow), mode="normal")
+    assert dg.source  # non-empty, valid DOT
+    # Only commits reachable within the shallow depth should be in the graph.
+    assert len(graph.commits) >= 1
+    assert len(graph.commits) <= 2  # depth=1 → at most tip commit visible
+
+
+def test_shallow_clone_shows_tip_commit(tmp_path: Path):
+    """The tip commit is visible; parents beyond the shallow depth are not."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    _, _, graph, _ = _build(str(shallow), mode="normal")
+    # Exactly 1 commit accessible in a depth-1 clone
+    assert len(graph.commits) == 1
+    # That commit has no parents recorded (shallow boundary)
+    only = next(iter(graph.commits.values()))
+    assert only.parents == []
+
+
+def test_shallow_clone_depth2_shows_two_commits(tmp_path: Path):
+    """depth=2 shallow clone exposes exactly 2 commits in the graph."""
+    _make_source_repo(tmp_path / "src", num_commits=4)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=2", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    _, _, graph, _ = _build(str(shallow), mode="normal")
+    assert len(graph.commits) == 2
+
+
+def test_shallow_clone_verbose_mode_no_crash(tmp_path: Path):
+    """Verbose mode (trees + blobs) on a shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, _, _ = _build(str(shallow), mode="verbose")
+    assert dg.source
+
+
+def test_shallow_clone_branch_mode_no_crash(tmp_path: Path):
+    """Branch mode on a shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, _, _ = _build(str(shallow), mode="branch")
+    assert dg.source

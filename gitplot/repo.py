@@ -29,11 +29,13 @@ def _branch_priority(name: str) -> int:
 # Data transfer objects
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RefInfo:
     """A git reference (branch, tag, HEAD, remote) with its resolved commit."""
-    path: str           # full ref path, e.g. "refs/heads/main"
-    name: str           # short display name, e.g. "main"
+
+    path: str  # full ref path, e.g. "refs/heads/main"
+    name: str  # short display name, e.g. "main"
     commit_hexsha: str
     is_head: bool = False
     is_branch: bool = False
@@ -45,22 +47,24 @@ class RefInfo:
 @dataclass
 class CommitData:
     """Lightweight representation of a git commit."""
+
     hexsha: str
-    parents: list[str]                            # parent hexshas in order
-    children: set[str] = field(default_factory=set)   # child hexshas (built post-BFS)
+    parents: list[str]  # parent hexshas in order
+    children: set[str] = field(default_factory=set)  # child hexshas (built post-BFS)
     refs: list[RefInfo] = field(default_factory=list)  # refs pointing here
     short_message: str = ""
     author: str = ""
     date_iso: str = ""
-    tree_hexsha: Optional[str] = None            # populated in verbose mode
+    tree_hexsha: Optional[str] = None  # populated in verbose mode
 
 
 @dataclass
 class TreeData:
     """Lightweight representation of a git tree (directory)."""
+
     hexsha: str
-    name: str                                    # basename; "/" for root
-    parent_hexsha: str                           # parent commit or tree hexsha
+    name: str  # basename; "/" for root
+    parent_hexsha: str  # parent commit or tree hexsha
     child_tree_hexshas: list[str] = field(default_factory=list)
     blob_hexshas: list[str] = field(default_factory=list)
 
@@ -68,21 +72,22 @@ class TreeData:
 @dataclass
 class BlobData:
     """Lightweight representation of a git blob (file)."""
+
     hexsha: str
-    name: str           # filename
+    name: str  # filename
     parent_tree_hexsha: str
 
 
 @dataclass
 class StagedFile:
     path: str
-    hexsha: str         # blob SHA in the index
+    hexsha: str  # blob SHA in the index
 
 
 @dataclass
 class UnstagedFile:
     path: str
-    workspace_hexsha: str   # computed blob SHA of the working-tree file
+    workspace_hexsha: str  # computed blob SHA of the working-tree file
 
 
 @dataclass
@@ -105,6 +110,7 @@ class BranchNode:
 @dataclass
 class ForkCommitNode:
     """A commit that is the common ancestor where two branches diverged."""
+
     hexsha: str
     short_hexsha: str
     date_iso: str
@@ -112,28 +118,29 @@ class ForkCommitNode:
 
 @dataclass
 class BranchEdge:
-    from_id: str        # branch name OR fork commit hexsha
-    to_name: str        # always a branch name
+    from_id: str  # branch name OR fork commit hexsha
+    to_name: str  # always a branch name
     from_is_fork: bool = False
 
 
 @dataclass
 class BranchTopology:
     nodes: list[BranchNode]
-    fork_commits: list[ForkCommitNode]   # divergence-point commit nodes
+    fork_commits: list[ForkCommitNode]  # divergence-point commit nodes
     edges: list[BranchEdge]
-    head_branch: Optional[str]   # branch name if not detached
-    head_commit: Optional[str]   # hexsha if detached
+    head_branch: Optional[str]  # branch name if not detached
+    head_commit: Optional[str]  # hexsha if detached
 
 
 @dataclass
 class RepoGraph:
     """Complete traversal result consumed by GraphBuilder."""
+
     commits: dict[str, CommitData]
-    trees: dict[str, TreeData]    # empty unless include_trees=True
-    blobs: dict[str, BlobData]    # empty unless include_trees=True
-    refs: list[RefInfo]           # HEAD first, then branches, tags, remotes
-    head_branch_path: Optional[str]   # branch ref path when not detached
+    trees: dict[str, TreeData]  # empty unless include_trees=True
+    blobs: dict[str, BlobData]  # empty unless include_trees=True
+    refs: list[RefInfo]  # HEAD first, then branches, tags, remotes
+    head_branch_path: Optional[str]  # branch ref path when not detached
     is_detached: bool
     hash_length: int
 
@@ -141,6 +148,7 @@ class RepoGraph:
 # ---------------------------------------------------------------------------
 # GitRepo
 # ---------------------------------------------------------------------------
+
 
 class GitRepo:
     """Wraps a git.Repo and provides the data model that GraphBuilder consumes."""
@@ -167,8 +175,13 @@ class GitRepo:
         """Traverse the repo and return a complete graph snapshot."""
         if not self.valid:
             return RepoGraph(
-                commits={}, trees={}, blobs={}, refs=[],
-                head_branch_path=None, is_detached=False, hash_length=5,
+                commits={},
+                trees={},
+                blobs={},
+                refs=[],
+                head_branch_path=None,
+                is_detached=False,
+                hash_length=5,
             )
 
         repo = self._repo
@@ -183,8 +196,12 @@ class GitRepo:
         refs = self._collect_refs(exclude_remotes)
         if not refs:
             return RepoGraph(
-                commits={}, trees={}, blobs={}, refs=[],
-                head_branch_path=head_branch_path, is_detached=is_detached,
+                commits={},
+                trees={},
+                blobs={},
+                refs=[],
+                head_branch_path=head_branch_path,
+                is_detached=is_detached,
                 hash_length=5,
             )
 
@@ -247,8 +264,11 @@ class GitRepo:
         """Compute branch ancestry relationships for branch-topology mode."""
         if not self.valid:
             return BranchTopology(
-                nodes=[], fork_commits=[], edges=[],
-                head_branch=None, head_commit=None,
+                nodes=[],
+                fork_commits=[],
+                edges=[],
+                head_branch=None,
+                head_commit=None,
             )
 
         repo = self._repo
@@ -263,12 +283,14 @@ class GitRepo:
 
         for branch in repo.branches:
             try:
-                nodes.append(BranchNode(
-                    name=branch.name,
-                    path=branch.path,
-                    commit_hexsha=branch.commit.hexsha,
-                    is_head=(head_branch == branch.name),
-                ))
+                nodes.append(
+                    BranchNode(
+                        name=branch.name,
+                        path=branch.path,
+                        commit_hexsha=branch.commit.hexsha,
+                        is_head=(head_branch == branch.name),
+                    )
+                )
             except Exception:
                 pass
 
@@ -276,12 +298,14 @@ class GitRepo:
             try:
                 for rref in repo.remote_refs:
                     try:
-                        nodes.append(BranchNode(
-                            name=rref.name,
-                            path=rref.path,
-                            commit_hexsha=rref.commit.hexsha,
-                            is_remote=True,
-                        ))
+                        nodes.append(
+                            BranchNode(
+                                name=rref.name,
+                                path=rref.path,
+                                commit_hexsha=rref.commit.hexsha,
+                                is_remote=True,
+                            )
+                        )
                     except Exception:
                         pass
             except Exception:
@@ -289,19 +313,24 @@ class GitRepo:
 
         for tag in repo.tags:
             try:
-                nodes.append(BranchNode(
-                    name=tag.name,
-                    path=tag.path,
-                    commit_hexsha=tag.commit.hexsha,
-                    is_tag=True,
-                ))
+                nodes.append(
+                    BranchNode(
+                        name=tag.name,
+                        path=tag.path,
+                        commit_hexsha=tag.commit.hexsha,
+                        is_tag=True,
+                    )
+                )
             except Exception:
                 pass
 
         fork_commits, edges = self._compute_branch_topology(nodes)
         return BranchTopology(
-            nodes=nodes, fork_commits=fork_commits, edges=edges,
-            head_branch=head_branch, head_commit=head_commit,
+            nodes=nodes,
+            fork_commits=fork_commits,
+            edges=edges,
+            head_branch=head_branch,
+            head_commit=head_commit,
         )
 
     # ------------------------------------------------------------------
@@ -318,14 +347,16 @@ class GitRepo:
         try:
             head_commit = repo.head.commit
         except ValueError:
-            return []   # empty repo with no commits yet
+            return []  # empty repo with no commits yet
 
-        refs.append(RefInfo(
-            path="HEAD",
-            name="HEAD",
-            commit_hexsha=head_commit.hexsha,
-            is_head=True,
-        ))
+        refs.append(
+            RefInfo(
+                path="HEAD",
+                name="HEAD",
+                commit_hexsha=head_commit.hexsha,
+                is_head=True,
+            )
+        )
         seen.add("HEAD")
 
         # Local branches
@@ -333,12 +364,14 @@ class GitRepo:
             if branch.path not in seen:
                 seen.add(branch.path)
                 try:
-                    refs.append(RefInfo(
-                        path=branch.path,
-                        name=branch.name,
-                        commit_hexsha=branch.commit.hexsha,
-                        is_branch=True,
-                    ))
+                    refs.append(
+                        RefInfo(
+                            path=branch.path,
+                            name=branch.name,
+                            commit_hexsha=branch.commit.hexsha,
+                            is_branch=True,
+                        )
+                    )
                 except Exception:
                     pass
 
@@ -348,13 +381,15 @@ class GitRepo:
                 seen.add(tag.path)
                 try:
                     is_annotated = isinstance(tag.object, git.TagObject)
-                    refs.append(RefInfo(
-                        path=tag.path,
-                        name=tag.name,
-                        commit_hexsha=tag.commit.hexsha,
-                        is_tag=True,
-                        tag_object_hexsha=tag.object.hexsha if is_annotated else None,
-                    ))
+                    refs.append(
+                        RefInfo(
+                            path=tag.path,
+                            name=tag.name,
+                            commit_hexsha=tag.commit.hexsha,
+                            is_tag=True,
+                            tag_object_hexsha=tag.object.hexsha if is_annotated else None,
+                        )
+                    )
                 except Exception:
                     pass
 
@@ -365,12 +400,14 @@ class GitRepo:
                     if rref.path not in seen:
                         seen.add(rref.path)
                         try:
-                            refs.append(RefInfo(
-                                path=rref.path,
-                                name=rref.name,
-                                commit_hexsha=rref.commit.hexsha,
-                                is_remote=True,
-                            ))
+                            refs.append(
+                                RefInfo(
+                                    path=rref.path,
+                                    name=rref.name,
+                                    commit_hexsha=rref.commit.hexsha,
+                                    is_remote=True,
+                                )
+                            )
                         except Exception:
                             pass
             except Exception:
@@ -404,30 +441,64 @@ class GitRepo:
 
         while queue:
             commit_obj, depth = queue.popleft()
-            hexsha = commit_obj.hexsha
+            try:
+                hexsha = commit_obj.hexsha
+            except Exception:
+                continue
             if hexsha in visited:
                 continue
             visited.add(hexsha)
 
-            parent_hexshas = [p.hexsha for p in commit_obj.parents]
-            msg = (commit_obj.message or "").split("\n")[0][:72]
+            # Collect parents; may fail for shallow-clone boundary commits whose
+            # parent objects are not present in the local object store.
+            accessible_parents: list[git.Commit] = []
+            parent_hexshas: list[str] = []
+            try:
+                for p in commit_obj.parents:
+                    try:
+                        parent_hexshas.append(p.hexsha)
+                        accessible_parents.append(p)
+                    except Exception:
+                        pass
+            except Exception as exc:
+                log.debug("Cannot read parents of %s (shallow boundary?): %s", hexsha[:8], exc)
+
+            try:
+                msg = (commit_obj.message or "").split("\n")[0][:72]
+                author = commit_obj.author.name
+                date_iso = commit_obj.authored_datetime.isoformat()
+            except Exception as exc:
+                # Commit object not in the local store — shallow clone boundary.
+                # Skip it entirely so we don't produce empty/phantom nodes.
+                log.debug("Commit %s is inaccessible (shallow boundary): %s", hexsha[:8], exc)
+                continue
+
+            tree_hexsha: Optional[str] = None
+            if include_trees:
+                try:
+                    tree_hexsha = commit_obj.tree.hexsha
+                    self._collect_tree(commit_obj.tree, hexsha, trees, blobs)
+                except Exception as exc:
+                    log.debug("Cannot access tree for %s: %s", hexsha[:8], exc)
 
             commits[hexsha] = CommitData(
                 hexsha=hexsha,
                 parents=parent_hexshas,
                 short_message=msg,
-                author=commit_obj.author.name,
-                date_iso=commit_obj.authored_datetime.isoformat(),
-                tree_hexsha=commit_obj.tree.hexsha if include_trees else None,
+                author=author,
+                date_iso=date_iso,
+                tree_hexsha=tree_hexsha,
             )
 
-            if include_trees:
-                self._collect_tree(commit_obj.tree, hexsha, trees, blobs)
-
             if max_depth is None or depth < max_depth:
-                for parent in commit_obj.parents:
+                for parent in accessible_parents:
                     if parent.hexsha not in visited:
                         queue.append((parent, depth + 1))
+
+        # Strip parent SHAs that aren't in commits — happens at shallow-clone
+        # boundaries and at max_depth cut-offs so we don't produce dangling edges.
+        for cd in commits.values():
+            cd.parents = [p for p in cd.parents if p in commits]
 
         return commits, trees, blobs
 
@@ -477,6 +548,7 @@ class GitRepo:
     def _compute_blob_hash(self, path: str) -> str:
         """Compute git's blob SHA for a working-tree file."""
         import os
+
         full_path = os.path.join(self._repo.working_dir, path)
         try:
             with open(full_path, "rb") as fh:
@@ -507,10 +579,10 @@ class GitRepo:
         # parent_map: child_name → (parent_id, is_strict_ancestor, rank_date)
         # parent_id is either a branch name or a fork hexsha.
         parent_map: dict[str, tuple[str, bool, int]] = {}
-        forks: dict[str, git.Commit] = {}   # hexsha → git.Commit for fork commits
+        forks: dict[str, git.Commit] = {}  # hexsha → git.Commit for fork commits
 
         for i, na in enumerate(nodes):
-            for nb in nodes[i + 1:]:
+            for nb in nodes[i + 1 :]:
                 if na.commit_hexsha == nb.commit_hexsha:
                     # Same tip commit: connect via a direct edge using name priority
                     # so e.g. "master" appears as parent of "develop" (not disconnected).
@@ -522,9 +594,7 @@ class GitRepo:
                         date = repo.commit(parent.commit_hexsha).committed_date
                     except Exception:
                         date = 0
-                    self._maybe_update_parent(
-                        parent_map, child.name, parent.name, True, date
-                    )
+                    self._maybe_update_parent(parent_map, child.name, parent.name, True, date)
                     continue
                 try:
                     ca = repo.commit(na.commit_hexsha)
@@ -549,25 +619,35 @@ class GitRepo:
                         # If the fork commit happens to be a branch tip, use
                         # that branch instead to keep the graph clean.
                         if base.hexsha in branch_hexshas:
-                            fork_branch = next(
-                                n for n in nodes if n.commit_hexsha == base.hexsha
-                            )
+                            fork_branch = next(n for n in nodes if n.commit_hexsha == base.hexsha)
                             self._maybe_update_parent(
-                                parent_map, na.name, fork_branch.name, True,
+                                parent_map,
+                                na.name,
+                                fork_branch.name,
+                                True,
                                 base.committed_date,
                             )
                             self._maybe_update_parent(
-                                parent_map, nb.name, fork_branch.name, True,
+                                parent_map,
+                                nb.name,
+                                fork_branch.name,
+                                True,
                                 base.committed_date,
                             )
                         else:
                             forks[base.hexsha] = base
                             self._maybe_update_parent(
-                                parent_map, na.name, base.hexsha, False,
+                                parent_map,
+                                na.name,
+                                base.hexsha,
+                                False,
                                 base.committed_date,
                             )
                             self._maybe_update_parent(
-                                parent_map, nb.name, base.hexsha, False,
+                                parent_map,
+                                nb.name,
+                                base.hexsha,
+                                False,
                                 base.committed_date,
                             )
                 except Exception as exc:
@@ -580,22 +660,25 @@ class GitRepo:
             is_fork = parent_id in forks
             if is_fork:
                 used_fork_hexshas.add(parent_id)
-            edges.append(BranchEdge(
-                from_id=parent_id,
-                to_name=child_name,
-                from_is_fork=is_fork,
-            ))
+            edges.append(
+                BranchEdge(
+                    from_id=parent_id,
+                    to_name=child_name,
+                    from_is_fork=is_fork,
+                )
+            )
 
         # Build fork node list (only forks actually referenced by edges)
         fork_commit_nodes: list[ForkCommitNode] = []
         for hexsha in used_fork_hexshas:
             base = forks[hexsha]
-            hl = max(7, len(hexsha))   # full SHA available but display short
-            fork_commit_nodes.append(ForkCommitNode(
-                hexsha=hexsha,
-                short_hexsha=hexsha[:8],
-                date_iso=base.authored_datetime.isoformat(),
-            ))
+            fork_commit_nodes.append(
+                ForkCommitNode(
+                    hexsha=hexsha,
+                    short_hexsha=hexsha[:8],
+                    date_iso=base.authored_datetime.isoformat(),
+                )
+            )
 
         return fork_commit_nodes, edges
 
