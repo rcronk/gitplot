@@ -17,8 +17,11 @@ class RepoTools(object):
         os.chdir(self.dir_name)
         output = subprocess.check_output(cmd).decode("utf-8", errors="replace").strip()
         os.chdir(old_dir)
-        cmd2 = r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
-        print(subprocess.check_output(cmd2))
+        print(
+            subprocess.check_output(
+                r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
+            )
+        )
         return output
 
     @staticmethod
@@ -28,14 +31,20 @@ class RepoTools(object):
     def create_file(self, name):
         with open(os.path.join(self.dir_name, name), "w") as f:
             f.write(self.get_random_string())
-        cmd2 = r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
-        print(subprocess.check_output(cmd2))
+        print(
+            subprocess.check_output(
+                r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
+            )
+        )
 
     def modify_file(self, name):
         with open(os.path.join(self.dir_name, name), "a") as f:
             f.write(self.get_random_string())
-        cmd2 = r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
-        print(subprocess.check_output(cmd2))
+        print(
+            subprocess.check_output(
+                r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
+            )
+        )
 
     def commit_file(self, name, message="Default message."):
         self.run(["git", "add", name])

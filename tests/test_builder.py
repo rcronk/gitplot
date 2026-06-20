@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+
 from gitplot.builder import GraphBuilder
 from gitplot.repo import (
     GitRepo,
@@ -256,17 +259,62 @@ def test_branch_mode_nodes(repo: RepoTools):
 
 
 def test_branch_mode_ancestry_edge(repo: RepoTools):
-    """dev was created from main → edge from main to dev in topology."""
+    """dev was created from main → main and dev connect via a fork commit node."""
     repo.write("a.txt")
-    repo.commit("base")
+    main_sha = repo.commit("base")
     repo.checkout("dev", new=True)
     repo.write("b.txt")
     repo.commit("dev-work")
     repo.checkout("main")
 
     dg, _, _, _ = _build(str(repo.path), mode="branch")
-    # main's tip is an ancestor of dev → edge main → dev
-    assert edge_in(dg.source, "main", "dev")
+    src = dg.source
+    # main's tip is the fork point: main → [main_sha] → dev
+    assert edge_in(src, "main", main_sha), "main must connect to its tip commit as fork node"
+    assert edge_in(src, main_sha, "dev"), "fork commit must connect to dev"
+
+
+def test_branch_strict_ancestor_inserts_fork_node(repo: RepoTools):
+    """Strict ancestry must insert a fork commit node, not a direct branch-to-branch edge."""
+    repo.write("a.txt")
+    main_sha = repo.commit("base")
+    repo.checkout("dev", new=True)
+    repo.write("b.txt")
+    repo.commit("dev-work")
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # A fork commit node (main's tip) must appear in the source
+    assert main_sha[:8] in src, "Fork commit's short SHA must appear as a node label"
+    # There must be no direct main → dev edge (fork commit must be the intermediary)
+    assert not edge_in(src, "main", "dev"), "Direct branch-to-branch edge must not exist"
+
+
+def test_branch_strict_ancestor_ancestor_to_fork_edge(repo: RepoTools):
+    """The ancestor branch has an edge pointing to the fork commit at its own tip."""
+    repo.write("a.txt")
+    main_sha = repo.commit("base")
+    repo.checkout("dev", new=True)
+    repo.write("b.txt")
+    repo.commit("dev-work")
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert edge_in(dg.source, "main", main_sha)
+
+
+def test_branch_strict_ancestor_fork_to_child_edge(repo: RepoTools):
+    """The fork commit node has an edge pointing to the descendant branch."""
+    repo.write("a.txt")
+    main_sha = repo.commit("base")
+    repo.checkout("dev", new=True)
+    repo.write("b.txt")
+    repo.commit("dev-work")
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert edge_in(dg.source, main_sha, "dev")
 
 
 def test_branch_mode_single_branch(repo: RepoTools):
@@ -381,22 +429,105 @@ def test_branch_ff_merge_stays_connected(repo: RepoTools):
 
 
 def test_branch_three_branch_linear_chain(repo: RepoTools):
-    """main → develop → feature — strict ancestry edges connect all three."""
+    """main → develop → feature — each branch connects to its tip as a fork commit node."""
     repo.write("a.txt")
-    repo.commit("on-main")
+    main_sha = repo.commit("on-main")
     repo.checkout("develop", new=True)
     repo.write("b.txt")
-    repo.commit("on-develop")
+    develop_sha = repo.commit("on-develop")
     repo.checkout("feature", new=True)
     repo.write("c.txt")
     repo.commit("on-feature")
 
     dg, _, _, _ = _build(str(repo.path), mode="branch")
     src = dg.source
-    # develop is ahead of main → edge main → develop
-    assert edge_in(src, "main", "develop"), "main must be parent of develop"
-    # feature is ahead of develop → edge develop → feature
-    assert edge_in(src, "develop", "feature"), "develop must be parent of feature"
+    # main connects to its fork commit, which connects to develop
+    assert edge_in(src, "main", main_sha), "main must connect to its fork commit"
+    assert edge_in(src, main_sha, "develop"), "main's fork commit must connect to develop"
+    # develop connects to its fork commit, which connects to feature
+    assert edge_in(src, "develop", develop_sha), "develop must connect to its fork commit"
+    assert edge_in(src, develop_sha, "feature"), "develop's fork commit must connect to feature"
+
+
+def test_branch_low_priority_ancestor_shown_as_fork_child(repo: RepoTools):
+    """A lower-priority ancestor branch must appear as a child of the fork, not its parent.
+
+    When feature/old (priority 2) is a strict ancestor of main (priority 0),
+    the diagram must show both as children of the shared fork commit — NOT the
+    chain  feature/old → [fork] → main  which falsely implies feature/old is a
+    root that main descended from.
+
+    Expected:  [fork] → feature/old
+               [fork] → main
+    Rejected:  feature/old → [fork] → main
+    """
+    repo.write("a.txt")
+    repo.commit("base")
+    # oldbranch adds a commit; main will fast-forward to it so that
+    # oldbranch's tip becomes a shared ancestor of main.
+    repo.checkout("oldbranch", new=True)
+    repo.write("b.txt")
+    repo.commit("oldbranch-work")
+    repo.checkout("main")
+    repo.merge("oldbranch", no_ff=False)  # fast-forward: main now at oldbranch's tip
+    fork_sha = repo.rev_parse("HEAD")  # oldbranch's tip = main's current position
+    repo.write("c.txt")
+    repo.commit("main-continues")  # main moves ahead; oldbranch stays at fork_sha
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+
+    # fork_sha must connect TO oldbranch (oldbranch is a sibling of main at the fork)
+    assert edge_in(src, fork_sha, "oldbranch"), (
+        "Fork commit must connect to oldbranch — oldbranch should be a child of the "
+        "fork, not its parent"
+    )
+    # The wrong direction must not be present
+    assert not edge_in(src, "oldbranch", fork_sha), (
+        "oldbranch must not appear as the parent of the fork commit"
+    )
+
+
+def test_branch_ancestor_connected_through_intermediate_fork(repo: RepoTools):
+    """main stays connected when a closer fork commit supersedes it as develop's parent.
+
+    Scenario: main (base) ← develop (intermediate) ← develop (more work)
+                                   ↑
+                               feature branches here
+
+    merge_base(main, develop) = main's tip (strict ancestor).
+    merge_base(develop, feature) = intermediate commit (diverged, more recent).
+
+    The more-recent fork overwrites parent_map["develop"] from main's tip to
+    intermediate.  main's tip is then absent from used_fork_hexshas, so
+    branch_at_fork["main"] can't generate its edge — main becomes an island.
+
+    The fix must generate main → [intermediate fork] so main stays connected.
+    """
+    repo.write("a.txt")
+    repo.commit("base")  # main's tip
+    repo.checkout("develop", new=True)
+    repo.write("b.txt")
+    repo.commit("intermediate")  # fork point between develop and feature
+    repo.checkout("feature", new=True)
+    repo.write("c.txt")
+    repo.commit("feature-work")
+    repo.checkout("develop")
+    repo.write("d.txt")
+    repo.commit("develop-extra")  # develop moves ahead of feature's branch point
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+
+    # main must not be an island — it must connect to something via an edge
+    assert "main" in src
+    assert "develop" in src
+    # There must be a path from main to develop (directly or via fork nodes)
+    main_has_outgoing = any(
+        f'"{nm}" -> ' in src or f"\t{nm} -> " in src or f" {nm} -> " in src for nm in ("main",)
+    )
+    assert main_has_outgoing, "main must have at least one outgoing edge (not an island)"
 
 
 # ---------------------------------------------------------------------------
@@ -619,3 +750,97 @@ def test_stash_multiple_entries_all_in_branch_mode(repo: RepoTools):
     src = dg.source
     # Both stash entries must be referenced
     assert "stash@{0}" in src and "stash@{1}" in src
+
+
+# ---------------------------------------------------------------------------
+# Shallow clone support (issue #6)
+# ---------------------------------------------------------------------------
+
+
+def _make_source_repo(path: Path, num_commits: int = 3) -> None:
+    """Create a plain git repo with num_commits commits; used as a clone source."""
+    path.mkdir()
+    for cmd in [
+        ["git", "init", "-b", "main"],
+        ["git", "config", "user.email", "test@gitplot.test"],
+        ["git", "config", "user.name", "GitPlot Test"],
+    ]:
+        subprocess.check_call(cmd, cwd=path, stderr=subprocess.DEVNULL)
+    for i in range(num_commits):
+        (path / f"f{i}.txt").write_text(str(i))
+        subprocess.check_call(["git", "add", "-A"], cwd=path, stderr=subprocess.DEVNULL)
+        subprocess.check_call(
+            ["git", "commit", "-m", f"commit {i}"], cwd=path, stderr=subprocess.DEVNULL
+        )
+
+
+def test_shallow_clone_normal_mode_no_crash(tmp_path: Path):
+    """Normal mode on a depth-1 shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, graph, _ = _build(str(shallow), mode="normal")
+    assert dg.source  # non-empty, valid DOT
+    # Only commits reachable within the shallow depth should be in the graph.
+    assert len(graph.commits) >= 1
+    assert len(graph.commits) <= 2  # depth=1 → at most tip commit visible
+
+
+def test_shallow_clone_shows_tip_commit(tmp_path: Path):
+    """The tip commit is visible; parents beyond the shallow depth are not."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    _, _, graph, _ = _build(str(shallow), mode="normal")
+    # Exactly 1 commit accessible in a depth-1 clone
+    assert len(graph.commits) == 1
+    # That commit has no parents recorded (shallow boundary)
+    only = next(iter(graph.commits.values()))
+    assert only.parents == []
+
+
+def test_shallow_clone_depth2_shows_two_commits(tmp_path: Path):
+    """depth=2 shallow clone exposes exactly 2 commits in the graph."""
+    _make_source_repo(tmp_path / "src", num_commits=4)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=2", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    _, _, graph, _ = _build(str(shallow), mode="normal")
+    assert len(graph.commits) == 2
+
+
+def test_shallow_clone_verbose_mode_no_crash(tmp_path: Path):
+    """Verbose mode (trees + blobs) on a shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, _, _ = _build(str(shallow), mode="verbose")
+    assert dg.source
+
+
+def test_shallow_clone_branch_mode_no_crash(tmp_path: Path):
+    """Branch mode on a shallow clone must not raise."""
+    _make_source_repo(tmp_path / "src", num_commits=3)
+    shallow = tmp_path / "shallow"
+    subprocess.check_call(
+        ["git", "clone", "--no-local", "--depth=1", str(tmp_path / "src"), str(shallow)],
+        stderr=subprocess.DEVNULL,
+    )
+
+    dg, _, _, _ = _build(str(shallow), mode="branch")
+    assert dg.source
