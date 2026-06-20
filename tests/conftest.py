@@ -5,7 +5,6 @@ RepoTools builds temporary git repos for use in functional and structural tests.
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
 
@@ -90,9 +89,11 @@ class RepoTools:
     # ------------------------------------------------------------------
 
     def _run(self, cmd: list[str]) -> str:
-        return subprocess.check_output(
-            cmd, cwd=self.path, stderr=subprocess.DEVNULL
-        ).decode("utf-8", errors="replace").strip()
+        return (
+            subprocess.check_output(cmd, cwd=self.path, stderr=subprocess.DEVNULL)
+            .decode("utf-8", errors="replace")
+            .strip()
+        )
 
 
 @pytest.fixture
@@ -105,6 +106,7 @@ def repo(tmp_path: Path) -> RepoTools:
 # Structural assertion helpers (importable from conftest)
 # ---------------------------------------------------------------------------
 
+
 def node_in(source: str, node_id: str) -> bool:
     """Return True if a node with node_id appears in the DOT source."""
     return f'"{node_id}"' in source or f" {node_id} " in source or f"\t{node_id} " in source
@@ -116,6 +118,6 @@ def edge_in(source: str, from_id: str, to_id: str) -> bool:
         f'"{from_id}" -> "{to_id}"',
         f'"{from_id}" -> {to_id}',
         f'{from_id} -> "{to_id}"',
-        f'{from_id} -> {to_id}',
+        f"{from_id} -> {to_id}",
     ]
     return any(p in source for p in patterns)

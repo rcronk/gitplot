@@ -20,9 +20,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         prog="gitplot",
         description="Generate Graphviz visualizations of git repository structure.",
     )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "--repo-path",
         default=".",
@@ -128,7 +126,9 @@ def _render_once(
     )
 
     index_state = repo.get_index_state() if args.mode == "verbose" else None
-    branch_topology = repo.get_branch_topology(args.exclude_remotes) if args.mode == "branch" else None
+    branch_topology = (
+        repo.get_branch_topology(args.exclude_remotes) if args.mode == "branch" else None
+    )
 
     # Branch mode flows forward in time left→right; commit modes flow right→left.
     if args.rank_direction is not None:
@@ -147,7 +147,7 @@ def _render_once(
     )
     dg = builder.build(graph, index_state=index_state, branch_topology=branch_topology)
 
-    out_path = renderer.render(dg)
+    renderer.render(dg)
     return builder.node_ids
 
 
