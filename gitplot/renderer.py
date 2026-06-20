@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
-import os
 import platform
 import shutil
 import subprocess
@@ -35,6 +34,9 @@ class Renderer:
         out_path = self.output_path
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
+        if self.output_format == "mermaid":
+            return self._render_mermaid(dg, out_path)
+
         # graphviz.render writes <filename>.<format> when given a source file.
         # We write the DOT to a temp file, render, then move to the desired path.
         with tempfile.NamedTemporaryFile(suffix=".dot", delete=False) as tmp:
@@ -57,6 +59,14 @@ class Renderer:
         log.info("Rendered %s", out_path)
         return out_path
 
+    def _render_mermaid(self, dg: graphviz.Digraph, out_path: Path) -> Path:
+        from .mermaid import dot_to_mermaid
+
+        mermaid_text = dot_to_mermaid(dg.source)
+        out_path.write_text(mermaid_text, encoding="utf-8")
+        log.info("Rendered %s", out_path)
+        return out_path
+
     def open_viewer(self, out_path: Path) -> None:
         """Launch the configured viewer for out_path."""
         if self.viewer == "none":
@@ -74,7 +84,7 @@ class Renderer:
     def _open_html(self, svg_path: Path) -> None:
         """Write display.html next to the SVG and open it once."""
         if self._html_written:
-            return   # Already open; SVG polling handles subsequent updates
+            return  # Already open; SVG polling handles subsequent updates
 
         html_path = svg_path.parent / "gitplot.html"
         _write_display_html(html_path, svg_path.name)
