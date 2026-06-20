@@ -661,6 +661,67 @@ def test_verbose_nested_tree(repo: RepoTools):
 
 
 # ---------------------------------------------------------------------------
+# FETCH_HEAD support (issue #8)
+# ---------------------------------------------------------------------------
+
+
+def _write_fetch_head(repo_path: Path, sha: str) -> None:
+    """Simulate a recent fetch by writing a .git/FETCH_HEAD file."""
+    (repo_path / ".git" / "FETCH_HEAD").write_text(
+        f"{sha}\t\tbranch 'main' of https://github.com/example/repo\n"
+    )
+
+
+def test_fetch_head_normal_mode_ref_node_appears(repo: RepoTools):
+    """FETCH_HEAD appears as a ref node in normal mode when the file exists."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_fetch_head(repo.path, sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "FETCH_HEAD")
+
+
+def test_fetch_head_normal_mode_edge_to_commit(repo: RepoTools):
+    """FETCH_HEAD ref node has an edge to the commit it points at."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_fetch_head(repo.path, sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert edge_in(dg.source, "FETCH_HEAD", sha)
+
+
+def test_fetch_head_branch_mode_node_appears(repo: RepoTools):
+    """FETCH_HEAD appears as a node in branch mode."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_fetch_head(repo.path, sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert node_in(dg.source, "FETCH_HEAD")
+
+
+def test_fetch_head_absent_no_phantom_node(repo: RepoTools):
+    """When .git/FETCH_HEAD doesn't exist, no FETCH_HEAD node appears."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert "FETCH_HEAD" not in dg.source
+
+
+def test_fetch_head_malformed_no_crash(repo: RepoTools):
+    """A malformed FETCH_HEAD file doesn't crash gitplot."""
+    repo.write("a.txt")
+    repo.commit("first")
+    (repo.path / ".git" / "FETCH_HEAD").write_text("not-a-valid-sha\n")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert isinstance(dg.source, str)
+
+
+# ---------------------------------------------------------------------------
 # Stash support (issue #7)
 # ---------------------------------------------------------------------------
 

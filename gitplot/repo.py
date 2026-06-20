@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
+import os
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
@@ -337,6 +338,17 @@ class GitRepo:
             except Exception:
                 pass
 
+        # FETCH_HEAD
+        fh_sha = self._read_fetch_head()
+        if fh_sha:
+            nodes.append(
+                BranchNode(
+                    name="FETCH_HEAD",
+                    path="FETCH_HEAD",
+                    commit_hexsha=fh_sha,
+                )
+            )
+
         fork_commits, edges = self._compute_branch_topology(nodes)
         return BranchTopology(
             nodes=nodes,
@@ -446,6 +458,18 @@ class GitRepo:
             except Exception:
                 pass
 
+        # FETCH_HEAD — present after any git fetch/pull
+        fh_sha = self._read_fetch_head()
+        if fh_sha and fh_sha not in seen:
+            seen.add("FETCH_HEAD")
+            refs.append(
+                RefInfo(
+                    path="FETCH_HEAD",
+                    name="FETCH_HEAD",
+                    commit_hexsha=fh_sha,
+                )
+            )
+
         if include_stash:
             for sha, label in self._collect_stash_entries():
                 path = f"stash/{label}"
@@ -464,6 +488,20 @@ class GitRepo:
                         pass
 
         return refs
+
+    def _read_fetch_head(self) -> Optional[str]:
+        """Return the commit SHA from .git/FETCH_HEAD, or None if absent/invalid."""
+        path = os.path.join(self._repo.git_dir, "FETCH_HEAD")
+        try:
+            with open(path) as fh:
+                sha = fh.readline().split("\t")[0].strip()
+            # Validate: must look like a hex SHA and resolve to a real commit
+            if len(sha) >= 40 and all(c in "0123456789abcdefABCDEF" for c in sha):
+                self._repo.commit(sha)  # raises if not in object store
+                return sha
+        except Exception:
+            pass
+        return None
 
     def _bfs_commits(
         self,
