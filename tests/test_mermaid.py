@@ -150,6 +150,20 @@ def test_mermaid_integration_branch_mode(repo: RepoTools):
     assert "main" in out
 
 
+def test_builder_accepts_mermaid_output_format(repo: RepoTools):
+    """GraphBuilder.build() must not raise when output_format='mermaid'.
+
+    Previously, passing 'mermaid' straight to graphviz.Digraph(format=...) caused
+    a ValueError because graphviz doesn't know that format.
+    """
+    repo.write("a.txt")
+    repo.commit("first")
+    graph = GitRepo(str(repo.path)).build_graph()
+    builder = GraphBuilder(mode="normal", rank_direction="RL", output_format="mermaid")
+    dg = builder.build(graph)  # must not raise
+    assert dg.source  # sanity: something was produced
+
+
 def test_mermaid_is_valid_structure(repo: RepoTools):
     """Mermaid output must start with flowchart and contain only safe IDs."""
     repo.write("a.txt")
