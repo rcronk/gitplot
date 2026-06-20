@@ -624,6 +624,30 @@ class GitRepo:
         for branch_name, fork_hexsha in branch_at_fork.items():
             if fork_hexsha in used_fork_hexshas:
                 edges.append(BranchEdge(from_id=branch_name, to_id=fork_hexsha, from_is_fork=False))
+            else:
+                # The branch's tip fork was superseded by a more-recent fork in
+                # parent_map (a closer divergence point overwrote it).  Find the
+                # oldest used fork that this branch's tip is an ancestor of and
+                # connect the branch there so it is not left as an island.
+                branch_commit = forks.get(fork_hexsha)
+                if branch_commit is None:
+                    continue
+                best_fork: str | None = None
+                best_date: int | None = None
+                for used_hex in used_fork_hexshas:
+                    try:
+                        bases = repo.merge_base(branch_commit, forks[used_hex])
+                    except Exception:
+                        continue
+                    if bases and bases[0].hexsha == branch_commit.hexsha:
+                        date = forks[used_hex].committed_date
+                        if best_date is None or date < best_date:
+                            best_date = date
+                            best_fork = used_hex
+                if best_fork:
+                    edges.append(
+                        BranchEdge(from_id=branch_name, to_id=best_fork, from_is_fork=False)
+                    )
 
         # Build fork node list (only forks actually referenced by edges)
         fork_commit_nodes: list[ForkCommitNode] = []

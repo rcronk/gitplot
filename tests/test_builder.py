@@ -446,6 +446,48 @@ def test_branch_three_branch_linear_chain(repo: RepoTools):
     assert edge_in(src, develop_sha, "feature"), "develop's fork commit must connect to feature"
 
 
+def test_branch_ancestor_connected_through_intermediate_fork(repo: RepoTools):
+    """main stays connected when a closer fork commit supersedes it as develop's parent.
+
+    Scenario: main (base) ← develop (intermediate) ← develop (more work)
+                                   ↑
+                               feature branches here
+
+    merge_base(main, develop) = main's tip (strict ancestor).
+    merge_base(develop, feature) = intermediate commit (diverged, more recent).
+
+    The more-recent fork overwrites parent_map["develop"] from main's tip to
+    intermediate.  main's tip is then absent from used_fork_hexshas, so
+    branch_at_fork["main"] can't generate its edge — main becomes an island.
+
+    The fix must generate main → [intermediate fork] so main stays connected.
+    """
+    repo.write("a.txt")
+    repo.commit("base")  # main's tip
+    repo.checkout("develop", new=True)
+    repo.write("b.txt")
+    repo.commit("intermediate")  # fork point between develop and feature
+    repo.checkout("feature", new=True)
+    repo.write("c.txt")
+    repo.commit("feature-work")
+    repo.checkout("develop")
+    repo.write("d.txt")
+    repo.commit("develop-extra")  # develop moves ahead of feature's branch point
+    repo.checkout("main")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+
+    # main must not be an island — it must connect to something via an edge
+    assert "main" in src
+    assert "develop" in src
+    # There must be a path from main to develop (directly or via fork nodes)
+    main_has_outgoing = any(
+        f'"{nm}" -> ' in src or f"\t{nm} -> " in src or f" {nm} -> " in src for nm in ("main",)
+    )
+    assert main_has_outgoing, "main must have at least one outgoing edge (not an island)"
+
+
 # ---------------------------------------------------------------------------
 # Branch mode: fork commit node
 # ---------------------------------------------------------------------------
