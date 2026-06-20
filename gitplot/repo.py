@@ -119,7 +119,7 @@ class ForkCommitNode:
 @dataclass
 class BranchEdge:
     from_id: str  # branch name OR fork commit hexsha
-    to_name: str  # always a branch name
+    to_id: str  # branch name OR fork commit hexsha
     from_is_fork: bool = False
 
 
@@ -563,23 +563,24 @@ class GitRepo:
     ) -> tuple[list[ForkCommitNode], list[BranchEdge]]:
         """Build edges for the branch topology diagram.
 
-        For each branch B we find its single best parent:
+        For each branch B we find its single best parent via a fork commit node:
           1. Strict ancestor: another branch whose tip is in B's history.
-             → direct branch-to-branch edge (no fork node needed).
+             → insert a ForkCommitNode at the ancestor's tip; edges ancestor→fork→B.
           2. Diverged: neither is ancestor of the other, but they share a
              recent common ancestor.
              → insert a ForkCommitNode at the merge-base; edges fork→both.
 
-        Strict ancestry always beats a diverged relationship. Among candidates
-        of the same type, the most recent merge-base wins.
+        The most recent merge-base always wins when multiple candidates exist.
+        Same-tip branches (fast-forward) stay as direct branch-to-branch edges.
         """
         repo = self._repo
-        branch_hexshas: set[str] = {n.commit_hexsha for n in nodes}
 
         # parent_map: child_name → (parent_id, is_strict_ancestor, rank_date)
-        # parent_id is either a branch name or a fork hexsha.
+        # parent_id is always a fork commit hexsha (or a branch name for same-tip case).
         parent_map: dict[str, tuple[str, bool, int]] = {}
         forks: dict[str, git.Commit] = {}  # hexsha → git.Commit for fork commits
+        # branch_at_fork: branch_name → fork_hexsha (the branch ends at this fork commit)
+        branch_at_fork: dict[str, str] = {}
 
         for i, na in enumerate(nodes):
             for nb in nodes[i + 1 :]:
@@ -605,55 +606,40 @@ class GitRepo:
                     base = bases[0]
 
                     if base.hexsha == ca.hexsha:
-                        # na is a strict ancestor of nb: edge na→nb
+                        # na is a strict ancestor of nb: fork commit at na's tip
+                        forks[ca.hexsha] = ca
                         self._maybe_update_parent(
-                            parent_map, nb.name, na.name, True, ca.committed_date
+                            parent_map, nb.name, ca.hexsha, False, ca.committed_date
                         )
+                        branch_at_fork[na.name] = ca.hexsha
                     elif base.hexsha == cb.hexsha:
-                        # nb is a strict ancestor of na: edge nb→na
+                        # nb is a strict ancestor of na: fork commit at nb's tip
+                        forks[cb.hexsha] = cb
                         self._maybe_update_parent(
-                            parent_map, na.name, nb.name, True, cb.committed_date
+                            parent_map, na.name, cb.hexsha, False, cb.committed_date
                         )
+                        branch_at_fork[nb.name] = cb.hexsha
                     else:
-                        # Diverged — use a fork commit node.
-                        # If the fork commit happens to be a branch tip, use
-                        # that branch instead to keep the graph clean.
-                        if base.hexsha in branch_hexshas:
-                            fork_branch = next(n for n in nodes if n.commit_hexsha == base.hexsha)
-                            self._maybe_update_parent(
-                                parent_map,
-                                na.name,
-                                fork_branch.name,
-                                True,
-                                base.committed_date,
-                            )
-                            self._maybe_update_parent(
-                                parent_map,
-                                nb.name,
-                                fork_branch.name,
-                                True,
-                                base.committed_date,
-                            )
-                        else:
-                            forks[base.hexsha] = base
-                            self._maybe_update_parent(
-                                parent_map,
-                                na.name,
-                                base.hexsha,
-                                False,
-                                base.committed_date,
-                            )
-                            self._maybe_update_parent(
-                                parent_map,
-                                nb.name,
-                                base.hexsha,
-                                False,
-                                base.committed_date,
-                            )
+                        # Diverged — fork commit at the common ancestor.
+                        forks[base.hexsha] = base
+                        self._maybe_update_parent(
+                            parent_map,
+                            na.name,
+                            base.hexsha,
+                            False,
+                            base.committed_date,
+                        )
+                        self._maybe_update_parent(
+                            parent_map,
+                            nb.name,
+                            base.hexsha,
+                            False,
+                            base.committed_date,
+                        )
                 except Exception as exc:
                     log.debug("merge_base(%s, %s) failed: %s", na.name, nb.name, exc)
 
-        # Build edge list
+        # Build edge list: fork → child
         edges: list[BranchEdge] = []
         used_fork_hexshas: set[str] = set()
         for child_name, (parent_id, is_strict, _) in parent_map.items():
@@ -663,10 +649,64 @@ class GitRepo:
             edges.append(
                 BranchEdge(
                     from_id=parent_id,
-                    to_name=child_name,
+                    to_id=child_name,
                     from_is_fork=is_fork,
                 )
             )
+
+        # Reverse lookup: fork_hexsha → child branch names (from parent_map)
+        fork_children: dict[str, list[str]] = {}
+        for child_name, (parent_id, _, _) in parent_map.items():
+            if parent_id in forks:
+                fork_children.setdefault(parent_id, []).append(child_name)
+
+        # Add branch ↔ fork edges for branches whose tip IS a fork commit.
+        # Direction depends on priority: if the branch is less "primary" than any
+        # existing child of the fork (higher _branch_priority number = less primary),
+        # show it as a sibling child of the fork rather than as the fork's parent.
+        # E.g. feature/rewrite (priority 2) ancestor of main (priority 0) →
+        #   fork → feature/rewrite  AND  fork → main  (both are children)
+        # But develop (priority 1) ancestor of feature/* (priority 2) →
+        #   develop → fork  (develop is the "primary" branch leading to the fork)
+        for branch_name, fork_hexsha in branch_at_fork.items():
+            if fork_hexsha in used_fork_hexshas:
+                children = fork_children.get(fork_hexsha, [])
+                if children and _branch_priority(branch_name) > min(
+                    _branch_priority(c) for c in children
+                ):
+                    # Lower-priority branch: flip — fork points TO the branch
+                    edges.append(
+                        BranchEdge(from_id=fork_hexsha, to_id=branch_name, from_is_fork=True)
+                    )
+                else:
+                    # Higher-or-equal-priority branch: keep — branch leads TO fork
+                    edges.append(
+                        BranchEdge(from_id=branch_name, to_id=fork_hexsha, from_is_fork=False)
+                    )
+            else:
+                # The branch's tip fork was superseded by a more-recent fork in
+                # parent_map (a closer divergence point overwrote it).  Find the
+                # oldest used fork that this branch's tip is an ancestor of and
+                # connect the branch there so it is not left as an island.
+                branch_commit = forks.get(fork_hexsha)
+                if branch_commit is None:
+                    continue
+                best_fork: str | None = None
+                best_date: int | None = None
+                for used_hex in used_fork_hexshas:
+                    try:
+                        bases = repo.merge_base(branch_commit, forks[used_hex])
+                    except Exception:
+                        continue
+                    if bases and bases[0].hexsha == branch_commit.hexsha:
+                        date = forks[used_hex].committed_date
+                        if best_date is None or date < best_date:
+                            best_date = date
+                            best_fork = used_hex
+                if best_fork:
+                    edges.append(
+                        BranchEdge(from_id=branch_name, to_id=best_fork, from_is_fork=False)
+                    )
 
         # Build fork node list (only forks actually referenced by edges)
         fork_commit_nodes: list[ForkCommitNode] = []
