@@ -233,10 +233,12 @@ def complex_e2e_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
     r.add("develop.txt")
     r.stash("wip: experiment")
 
-    # Working tree state for verbose-mode tests
-    (base / "scratch.txt").write_text("not tracked\n", encoding="utf-8")
-    (base / "develop.txt").write_text("unstaged modification\n", encoding="utf-8")
-    (base / "index_file.txt").write_text("staged content\n", encoding="utf-8")
+    # Working tree state for verbose-mode tests.
+    # write_bytes guarantees LF on all platforms; write_text on Windows would
+    # produce CRLF, changing workspace_hexsha and breaking cross-platform golden files.
+    (base / "scratch.txt").write_bytes(b"not tracked\n")
+    (base / "develop.txt").write_bytes(b"unstaged modification\n")
+    (base / "index_file.txt").write_bytes(b"staged content\n")
     subprocess.check_output(["git", "add", "index_file.txt"], cwd=base, stderr=subprocess.DEVNULL)
 
     return base
