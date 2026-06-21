@@ -796,9 +796,11 @@ class GitRepo:
                         BranchEdge(from_id=branch_name, to_id=best_fork, from_is_fork=False)
                     )
 
-        # Build fork node list (only forks actually referenced by edges)
+        # Build fork node list (only forks actually referenced by edges).
+        # Sort by hexsha so the output order is deterministic across processes
+        # (set iteration order is randomised by Python's hash seed).
         fork_commit_nodes: list[ForkCommitNode] = []
-        for hexsha in used_fork_hexshas:
+        for hexsha in sorted(used_fork_hexshas):
             base = forks[hexsha]
             fork_commit_nodes.append(
                 ForkCommitNode(
