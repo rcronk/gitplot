@@ -1,6 +1,6 @@
 digraph {
 	graph [rankdir=RL]
-	develop [label="HEAD→develop" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	develop [label="HEAD->develop" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
 	"feature/alpha" [label="feature/alpha" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
 	"feature/beta" [label="feature/beta" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
 	main [label=main color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]

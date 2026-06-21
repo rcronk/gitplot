@@ -154,9 +154,9 @@ flowchart RL
     c33e73c6409632d1e00d353d3496d65cf06675df --> 112885a309337593323175787051795afbcd2ad7
     112885a309337593323175787051795afbcd2ad7 --> c2f575b00ce2b17e91b59cc868ad7ccac2a07530
     112885a309337593323175787051795afbcd2ad7 --> 790db164f18098ef413853e56f7d93e70a2c187a
-    Staged_Changes --> staged
-    Unstaged_Changes --> unstaged
-    Untracked --> untracked
+    Staged_Changes -->|"index_file.txt"| staged_index_file_txt
+    Unstaged_Changes -->|"develop.txt"| unstaged_develop_txt
+    Untracked -->|"scratch.txt"| untracked_scratch_txt
     style HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style refs_heads_develop fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style 790db164f18098ef413853e56f7d93e70a2c187a fill:#f6ffe5,stroke:#aaff00,stroke-width:2px

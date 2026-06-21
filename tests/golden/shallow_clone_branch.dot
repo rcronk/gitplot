@@ -1,4 +1,4 @@
 digraph {
 	graph [rankdir=RL]
-	main [label="HEAD→main" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	main [label="HEAD->main" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
 }

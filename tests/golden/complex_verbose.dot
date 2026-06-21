@@ -163,14 +163,14 @@ a1730" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	"112885a309337593323175787051795afbcd2ad7" -> c2f575b00ce2b17e91b59cc868ad7ccac2a07530 [label=tree]
 	"112885a309337593323175787051795afbcd2ad7" -> "790db164f18098ef413853e56f7d93e70a2c187a" [label=parent]
 	"Staged Changes" [label="Staged Changes" color="0.667 1.000 1.000" fillcolor="0.667 0.100 1.000" penwidth=2 style=filled]
-	"staged:index_file.txt" [label="index_file.txt
+	"staged|index_file.txt" [label="index_file.txt
 00000" color="0.667 1.000 1.000" fillcolor="0.667 0.100 1.000" penwidth=2 style=filled]
-	"Staged Changes" -> staged:"index_file.txt" [label="index_file.txt"]
+	"Staged Changes" -> "staged|index_file.txt" [label="index_file.txt"]
 	"Unstaged Changes" [label="Unstaged Changes" color="0.778 1.000 1.000" fillcolor="0.778 0.100 1.000" penwidth=2 style=filled]
-	"unstaged:develop.txt" [label="develop.txt
+	"unstaged|develop.txt" [label="develop.txt
 1a892" color="0.778 1.000 1.000" fillcolor="0.778 0.100 1.000" penwidth=2 style=filled]
-	"Unstaged Changes" -> unstaged:"develop.txt" [label="develop.txt"]
+	"Unstaged Changes" -> "unstaged|develop.txt" [label="develop.txt"]
 	Untracked [label=Untracked color="0.889 1.000 1.000" fillcolor="0.889 0.100 1.000" penwidth=2 style=filled]
-	"untracked:scratch.txt" [label="scratch.txt" color="0.889 1.000 1.000" fillcolor="0.889 0.100 1.000" penwidth=2 style=filled]
-	Untracked -> untracked:"scratch.txt" [label="scratch.txt"]
+	"untracked|scratch.txt" [label="scratch.txt" color="0.889 1.000 1.000" fillcolor="0.889 0.100 1.000" penwidth=2 style=filled]
+	Untracked -> "untracked|scratch.txt" [label="scratch.txt"]
 }
