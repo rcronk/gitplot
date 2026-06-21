@@ -24,7 +24,7 @@ class GraphBuilder:
     """Builds a graphviz.Digraph from repo data.
 
     Instantiate once per render; call build() to produce the Digraph.
-    After build(), node_ids contains the IDs of every node added—used by
+    After build(), node_ids contains the IDs of every node added -- used by
     Monitor to track what's new between renders.
     """
 
@@ -34,13 +34,14 @@ class GraphBuilder:
         rank_direction: str = "RL",
         output_format: str = "svg",
         commit_details: bool = False,
-        highlight_ids: Optional[set[str]] = None,
+        highlight_ids: Optional[frozenset[str]] = None,
     ) -> None:
         self.mode = mode
         self.rank_direction = rank_direction
         self.output_format = output_format
         self.commit_details = commit_details
-        self.highlight_ids: set[str] = highlight_ids or set()
+        # None means "no highlighting"; a frozenset means "highlight nodes absent from this set"
+        self.highlight_ids: Optional[frozenset[str]] = highlight_ids
 
         self._rendered_nodes: set[str] = set()
         self._rendered_edges: set[tuple[str, str]] = set()
@@ -90,16 +91,16 @@ class GraphBuilder:
             if ref.is_head:
                 self._add_node(dg, ref_id, label="HEAD", type_key="ref")
                 if graph.head_branch_path:
-                    # Non-detached: HEAD → branch ref node
+                    # Non-detached: HEAD -> branch ref node
                     self._add_edge(dg, ref_id, graph.head_branch_path, label="HEAD")
                     # The branch ref will walk the commit chain
                     continue
                 else:
-                    # Detached HEAD → commit
+                    # Detached HEAD -> commit
                     self._add_edge(dg, ref_id, ref.commit_hexsha, label="HEAD")
 
             elif ref.is_tag and ref.tag_object_hexsha:
-                # Annotated tag: ref → tag-object → commit
+                # Annotated tag: ref -> tag-object -> commit
                 self._add_node(dg, ref_id, label=ref.name, type_key="tag")
                 tag_obj_id = ref.tag_object_hexsha
                 self._add_node(dg, tag_obj_id, label=tag_obj_id[:hl], type_key="tag")
@@ -200,7 +201,7 @@ class GraphBuilder:
         cd = graph.commits.get(hexsha)
         label = hexsha[:hl]
         if self.commit_details and cd:
-            msg = cd.short_message[:40] + ("…" if len(cd.short_message) > 40 else "")
+            msg = cd.short_message[:40] + ("..." if len(cd.short_message) > 40 else "")
             label = "\n".join([label, cd.author, msg, cd.date_iso[:10]])
 
         self._add_node(dg, hexsha, label=label, type_key="commit")
@@ -249,7 +250,7 @@ class GraphBuilder:
         if index_state.staged:
             self._add_node(dg, "Staged Changes", label="Staged Changes", type_key="staged_changes")
             for sf in index_state.staged:
-                node_id = f"staged:{sf.path}"
+                node_id = f"staged|{sf.path}"
                 label = f"{sf.path}\n{sf.hexsha[:hl]}"
                 self._add_node(dg, node_id, label=label, type_key="staged_changes")
                 self._add_edge(dg, "Staged Changes", node_id, label=sf.path)
@@ -259,7 +260,7 @@ class GraphBuilder:
                 dg, "Unstaged Changes", label="Unstaged Changes", type_key="unstaged_changes"
             )
             for uf in index_state.unstaged:
-                node_id = f"unstaged:{uf.path}"
+                node_id = f"unstaged|{uf.path}"
                 label = f"{uf.path}\n{uf.workspace_hexsha[:hl]}"
                 self._add_node(dg, node_id, label=label, type_key="unstaged_changes")
                 self._add_edge(dg, "Unstaged Changes", node_id, label=uf.path)
@@ -267,7 +268,7 @@ class GraphBuilder:
         if index_state.untracked:
             self._add_node(dg, "Untracked", label="Untracked", type_key="untracked_file")
             for path in index_state.untracked:
-                node_id = f"untracked:{path}"
+                node_id = f"untracked|{path}"
                 self._add_node(dg, node_id, label=path, type_key="untracked_file")
                 self._add_edge(dg, "Untracked", node_id, label=path)
 
@@ -284,10 +285,10 @@ class GraphBuilder:
             type_key = "tag" if node.is_tag else "ref"
             label = node.name
             if node.is_head:
-                label = f"HEAD→{node.name}"
+                label = f"HEAD->{node.name}"
             self._add_node(dg, node.name, label=label, type_key=type_key)
 
-        # Fork commit nodes — shown as commit-style nodes labelled with short hash
+        # Fork commit nodes -- shown as commit-style nodes labelled with short hash
         for fork in topo.fork_commits:
             label = f"fork\n{fork.short_hexsha}"
             self._add_node(dg, fork.hexsha, label=label, type_key="commit")
@@ -310,8 +311,13 @@ class GraphBuilder:
         return len(cd.parents) == 1 and len(cd.children) == 1 and len(cd.refs) == 0
 
     def _colors_for(self, node_id: str, type_key: str) -> NodeColors:
-        """Return colors, substituting highlight colors for new nodes."""
-        if node_id in self.highlight_ids:
+        """Return colors, substituting highlight colors for new nodes.
+
+        highlight_ids holds node IDs from the *previous* render.  A node absent
+        from that set is new and gets the highlight color.  None means monitoring
+        is not active and no node is highlighted.
+        """
+        if self.highlight_ids is not None and node_id not in self.highlight_ids:
             return SCHEME["new_node"]
         return SCHEME.get(type_key, SCHEME["commit"])
 

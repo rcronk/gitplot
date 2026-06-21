@@ -136,7 +136,7 @@ def _render_once(
         repo.get_branch_topology(args.exclude_remotes) if args.mode == "branch" else None
     )
 
-    # Branch mode flows forward in time left→right; commit modes flow right→left.
+    # Branch mode flows forward in time left-to-right; commit modes flow right-to-left.
     if args.rank_direction is not None:
         rank_direction = args.rank_direction
     elif args.mode == "branch":
@@ -191,9 +191,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     try:
         while True:
             mon.wait()
-            logging.info("Change detected — re-rendering…")
-            highlight = mon.prev_node_ids if args.mode == "verbose" else None
-            node_ids = _render_once(args, renderer, highlight_ids=highlight)
+            logging.info("Change detected - re-rendering...")
+            node_ids = _render_once(args, renderer, highlight_ids=mon.prev_node_ids)
             mon.update(node_ids)
     except KeyboardInterrupt:
         logging.info("Monitor stopped.")
