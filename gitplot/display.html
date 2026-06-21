@@ -25,7 +25,7 @@
       next.onload = function () {
         // next is already fully loaded in memory; replaceChild/appendChild
         // moves it into #container atomically so the old SVG stays visible
-        // right up to the moment the new one appears — no blank frame.
+        // right up to the moment the new one appears -- no blank frame.
         if (displayed) {
           c.replaceChild(next, displayed);
         } else {
