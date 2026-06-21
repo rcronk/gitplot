@@ -188,6 +188,73 @@ def test_commit_details_flag(repo: RepoTools):
 
 
 # ---------------------------------------------------------------------------
+# Node type-prefix labels (commit/tree/blob/tag)
+# ---------------------------------------------------------------------------
+
+
+def test_commit_node_label_has_type_prefix(repo: RepoTools):
+    """Commit nodes must be labelled with 'commit' on the first line, hash on the second."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    dg, _, _, _ = _build(str(repo.path))
+    # graphviz renders \n as a real newline in the DOT source string
+    assert f"commit\n{sha[:5]}" in dg.source, (
+        "commit node label must start with 'commit' on the first line"
+    )
+
+
+def test_commit_details_type_prefix_preserved(repo: RepoTools):
+    """With --commit-details, the type prefix must still appear before the hash."""
+    repo.write("a.txt")
+    sha = repo.commit("my message")
+    dg, _, _, _ = _build(str(repo.path), commit_details=True)
+    assert f"commit\n{sha[:5]}" in dg.source
+    assert "my message" in dg.source
+
+
+def test_tree_node_label_has_type_prefix(repo: RepoTools):
+    """Tree nodes in verbose mode must be labelled with 'tree' on the first line."""
+    repo.write("a.txt", content="x")
+    repo.commit("first")
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    tree_sha = next(iter(graph.trees))
+    assert f"tree\n{tree_sha[:5]}" in dg.source, (
+        "tree node label must start with 'tree' on the first line"
+    )
+
+
+def test_blob_node_label_has_type_prefix(repo: RepoTools):
+    """Blob nodes in verbose mode must be labelled with 'blob' on the first line."""
+    repo.write("a.txt", content="x")
+    repo.commit("first")
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    blob_sha = next(iter(graph.blobs))
+    assert f"blob\n{blob_sha[:5]}" in dg.source, (
+        "blob node label must start with 'blob' on the first line"
+    )
+
+
+def test_tag_node_label_has_type_prefix(repo: RepoTools):
+    """Tag ref nodes must be labelled with 'tag' on the first line."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.tag("v1.0")
+    dg, _, _, _ = _build(str(repo.path))
+    assert "tag\nv1.0" in dg.source, "tag node label must start with 'tag' on the first line"
+
+
+def test_annotated_tag_node_label_has_type_prefix(repo: RepoTools):
+    """Annotated tag ref nodes must also carry the 'tag' prefix line."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.tag("v2.0", annotated=True, message="Release")
+    dg, _, _, _ = _build(str(repo.path))
+    assert "tag\nv2.0" in dg.source, (
+        "annotated tag ref node label must start with 'tag' on the first line"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Verbose mode
 # ---------------------------------------------------------------------------
 

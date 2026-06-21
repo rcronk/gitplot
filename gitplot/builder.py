@@ -101,15 +101,16 @@ class GraphBuilder:
 
             elif ref.is_tag and ref.tag_object_hexsha:
                 # Annotated tag: ref -> tag-object -> commit
-                self._add_node(dg, ref_id, label=ref.name, type_key="tag")
+                self._add_node(dg, ref_id, label=f"tag\n{ref.name}", type_key="tag")
                 tag_obj_id = ref.tag_object_hexsha
-                self._add_node(dg, tag_obj_id, label=tag_obj_id[:hl], type_key="tag")
+                self._add_node(dg, tag_obj_id, label=f"tag\n{tag_obj_id[:hl]}", type_key="tag")
                 self._add_edge(dg, ref_id, tag_obj_id, label="tag")
                 self._add_edge(dg, tag_obj_id, ref.commit_hexsha, label="commit")
 
             else:
                 type_key = "tag" if ref.is_tag else "ref"
-                self._add_node(dg, ref_id, label=ref.name, type_key=type_key)
+                label = f"tag\n{ref.name}" if ref.is_tag else ref.name
+                self._add_node(dg, ref_id, label=label, type_key=type_key)
                 edge_label = "branch" if ref.is_branch else "tag" if ref.is_tag else "remote"
                 self._add_edge(dg, ref_id, ref.commit_hexsha, label=edge_label)
 
@@ -199,7 +200,7 @@ class GraphBuilder:
     ) -> None:
         """Add a single commit node, with optional detail lines."""
         cd = graph.commits.get(hexsha)
-        label = hexsha[:hl]
+        label = f"commit\n{hexsha[:hl]}"
         if self.commit_details and cd:
             msg = cd.short_message[:40] + ("..." if len(cd.short_message) > 40 else "")
             label = "\n".join([label, cd.author, msg, cd.date_iso[:10]])
@@ -227,11 +228,11 @@ class GraphBuilder:
         if td is None:
             return
 
-        self._add_node(dg, tree_hexsha, label=tree_hexsha[:hl], type_key="tree")
+        self._add_node(dg, tree_hexsha, label=f"tree\n{tree_hexsha[:hl]}", type_key="tree")
         self._add_edge(dg, parent_id, tree_hexsha, label="tree")
 
         for name, blob_hexsha in td.blob_entries:
-            self._add_node(dg, blob_hexsha, label=blob_hexsha[:hl], type_key="blob")
+            self._add_node(dg, blob_hexsha, label=f"blob\n{blob_hexsha[:hl]}", type_key="blob")
             self._add_edge(dg, tree_hexsha, blob_hexsha, label=name)
 
         for child_tree_hexsha in td.child_tree_hexshas:
