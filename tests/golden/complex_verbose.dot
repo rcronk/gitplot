@@ -7,20 +7,15 @@ digraph {
 	"790db164f18098ef413853e56f7d93e70a2c187a" [label="790db" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
 	f402fa6c1016fcdcff2de566c4b4b2654d8acd5d [label=f402f color="0.444 1.000 1.000" fillcolor="0.444 0.100 1.000" penwidth=2 style=filled]
 	"790db164f18098ef413853e56f7d93e70a2c187a" -> f402fa6c1016fcdcff2de566c4b4b2654d8acd5d [label=tree]
-	"303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md
-303dd" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"303ddddd86883f5558adc9d682135c455484e2e5" [label="303dd" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	f402fa6c1016fcdcff2de566c4b4b2654d8acd5d -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
-	"75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt
-75a69" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"75a69bc3472a11337ee6295f6b77e052fd098002" [label="75a69" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	f402fa6c1016fcdcff2de566c4b4b2654d8acd5d -> "75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt"]
-	a0f9a4b4bc907de626292ea1edbab06250694827 [label="develop.txt
-a0f9a" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	a0f9a4b4bc907de626292ea1edbab06250694827 [label=a0f9a color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	f402fa6c1016fcdcff2de566c4b4b2654d8acd5d -> a0f9a4b4bc907de626292ea1edbab06250694827 [label="develop.txt"]
-	"95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt
-95a1f" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="95a1f" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	f402fa6c1016fcdcff2de566c4b4b2654d8acd5d -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
-	"66e9a0d2f63c60d180b5ff437a8231611adaddc6" [label="file2.txt
-66e9a" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"66e9a0d2f63c60d180b5ff437a8231611adaddc6" [label="66e9a" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	f402fa6c1016fcdcff2de566c4b4b2654d8acd5d -> "66e9a0d2f63c60d180b5ff437a8231611adaddc6" [label="file2.txt"]
 	"790db164f18098ef413853e56f7d93e70a2c187a" -> "0b18da950bf84d50fbc7562a4747f13094fc85df" [label=parent]
 	"0b18da950bf84d50fbc7562a4747f13094fc85df" [label="0b18d" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
@@ -28,8 +23,7 @@ a0f9a" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	"0b18da950bf84d50fbc7562a4747f13094fc85df" -> cb9a102698e08fde659c8dc35f746fd4d3b736a5 [label=tree]
 	cb9a102698e08fde659c8dc35f746fd4d3b736a5 -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
 	cb9a102698e08fde659c8dc35f746fd4d3b736a5 -> "75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt"]
-	"39ed40bfad4199fb9caf6b8708f6ceb29dddad55" [label="develop.txt
-39ed4" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"39ed40bfad4199fb9caf6b8708f6ceb29dddad55" [label="39ed4" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	cb9a102698e08fde659c8dc35f746fd4d3b736a5 -> "39ed40bfad4199fb9caf6b8708f6ceb29dddad55" [label="develop.txt"]
 	cb9a102698e08fde659c8dc35f746fd4d3b736a5 -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
 	cb9a102698e08fde659c8dc35f746fd4d3b736a5 -> "66e9a0d2f63c60d180b5ff437a8231611adaddc6" [label="file2.txt"]
@@ -39,8 +33,7 @@ a0f9a" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	"34f5775c53e87185c6f0c5342e74c9f9d9a06c40" -> ef7d89c5c18b0536fb7fb223de667dad764790e2 [label=tree]
 	ef7d89c5c18b0536fb7fb223de667dad764790e2 -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
 	ef7d89c5c18b0536fb7fb223de667dad764790e2 -> "75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt"]
-	"579608ebc45ea5a4fbd99f327d8e87747ba0bcd0" [label="develop.txt
-57960" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"579608ebc45ea5a4fbd99f327d8e87747ba0bcd0" [label=57960 color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	ef7d89c5c18b0536fb7fb223de667dad764790e2 -> "579608ebc45ea5a4fbd99f327d8e87747ba0bcd0" [label="develop.txt"]
 	ef7d89c5c18b0536fb7fb223de667dad764790e2 -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
 	ef7d89c5c18b0536fb7fb223de667dad764790e2 -> "66e9a0d2f63c60d180b5ff437a8231611adaddc6" [label="file2.txt"]
@@ -50,8 +43,7 @@ a0f9a" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	b8e06ba0f1639a2621da80b7b45bf60c9c90abda -> e93fa8bfe86f6204ff476394d1395632759ecd68 [label=tree]
 	e93fa8bfe86f6204ff476394d1395632759ecd68 -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
 	e93fa8bfe86f6204ff476394d1395632759ecd68 -> "75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt"]
-	"1e9c3ad5bf46b88f5866a53745447482284bf6f9" [label="develop.txt
-1e9c3" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"1e9c3ad5bf46b88f5866a53745447482284bf6f9" [label="1e9c3" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	e93fa8bfe86f6204ff476394d1395632759ecd68 -> "1e9c3ad5bf46b88f5866a53745447482284bf6f9" [label="develop.txt"]
 	e93fa8bfe86f6204ff476394d1395632759ecd68 -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
 	e93fa8bfe86f6204ff476394d1395632759ecd68 -> "66e9a0d2f63c60d180b5ff437a8231611adaddc6" [label="file2.txt"]
@@ -61,8 +53,7 @@ a0f9a" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	de59f3a1667fc051ccc0b0682694585e36040bf4 -> "7e4da62c636b6687f6affdd75895cbb867edd60f" [label=tree]
 	"7e4da62c636b6687f6affdd75895cbb867edd60f" -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
 	"7e4da62c636b6687f6affdd75895cbb867edd60f" -> "75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt"]
-	"0af3daa9e28399e5345bd9961a2ff9c3b205659a" [label="develop.txt
-0af3d" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"0af3daa9e28399e5345bd9961a2ff9c3b205659a" [label="0af3d" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	"7e4da62c636b6687f6affdd75895cbb867edd60f" -> "0af3daa9e28399e5345bd9961a2ff9c3b205659a" [label="develop.txt"]
 	"7e4da62c636b6687f6affdd75895cbb867edd60f" -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
 	"7e4da62c636b6687f6affdd75895cbb867edd60f" -> "66e9a0d2f63c60d180b5ff437a8231611adaddc6" [label="file2.txt"]
@@ -75,8 +66,7 @@ a0f9a" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	"0aeab4513b0974c994319324459ffd1f719bf214" [label="0aeab" color="0.444 1.000 1.000" fillcolor="0.444 0.100 1.000" penwidth=2 style=filled]
 	"98c0271fb08e9ec656af44e1ce7e1f310d722f3b" -> "0aeab4513b0974c994319324459ffd1f719bf214" [label=tree]
 	"0aeab4513b0974c994319324459ffd1f719bf214" -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
-	d075eae27ad577ffbe2575a096bdffe45022317b [label="alpha.txt
-d075e" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	d075eae27ad577ffbe2575a096bdffe45022317b [label=d075e color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	"0aeab4513b0974c994319324459ffd1f719bf214" -> d075eae27ad577ffbe2575a096bdffe45022317b [label="alpha.txt"]
 	"0aeab4513b0974c994319324459ffd1f719bf214" -> "0af3daa9e28399e5345bd9961a2ff9c3b205659a" [label="develop.txt"]
 	"0aeab4513b0974c994319324459ffd1f719bf214" -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
@@ -116,8 +106,7 @@ d075e" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	eb852ccf183082960915022040318f9549283f89 -> "1932397668064ab7e82715c6f79d47e8c2b2eac9" [label=tree]
 	"1932397668064ab7e82715c6f79d47e8c2b2eac9" -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
 	"1932397668064ab7e82715c6f79d47e8c2b2eac9" -> "75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt"]
-	"892f5705b5026ed7130eae97ab57da9572ec2f00" [label="beta.txt
-892f5" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	"892f5705b5026ed7130eae97ab57da9572ec2f00" [label="892f5" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	"1932397668064ab7e82715c6f79d47e8c2b2eac9" -> "892f5705b5026ed7130eae97ab57da9572ec2f00" [label="beta.txt"]
 	"1932397668064ab7e82715c6f79d47e8c2b2eac9" -> "39ed40bfad4199fb9caf6b8708f6ceb29dddad55" [label="develop.txt"]
 	"1932397668064ab7e82715c6f79d47e8c2b2eac9" -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
@@ -128,8 +117,7 @@ d075e" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	"886fab2b89c493ab873baa91ecb1438da7321edc" -> f7fc420ec36ab4b139311a811157bb7681def36e [label=tree]
 	f7fc420ec36ab4b139311a811157bb7681def36e -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
 	f7fc420ec36ab4b139311a811157bb7681def36e -> "75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt"]
-	a77d4b8eacb32787386d8fabd77b7f8095352a85 [label="beta.txt
-a77d4" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	a77d4b8eacb32787386d8fabd77b7f8095352a85 [label=a77d4 color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	f7fc420ec36ab4b139311a811157bb7681def36e -> a77d4b8eacb32787386d8fabd77b7f8095352a85 [label="beta.txt"]
 	f7fc420ec36ab4b139311a811157bb7681def36e -> "39ed40bfad4199fb9caf6b8708f6ceb29dddad55" [label="develop.txt"]
 	f7fc420ec36ab4b139311a811157bb7681def36e -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
@@ -152,8 +140,7 @@ a77d4" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	c33e73c6409632d1e00d353d3496d65cf06675df -> c2f575b00ce2b17e91b59cc868ad7ccac2a07530 [label=tree]
 	c2f575b00ce2b17e91b59cc868ad7ccac2a07530 -> "303ddddd86883f5558adc9d682135c455484e2e5" [label="README.md"]
 	c2f575b00ce2b17e91b59cc868ad7ccac2a07530 -> "75a69bc3472a11337ee6295f6b77e052fd098002" [label="alpha.txt"]
-	a1730e1af68de3d9c44ad600a077143309128fc1 [label="develop.txt
-a1730" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	a1730e1af68de3d9c44ad600a077143309128fc1 [label=a1730 color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	c2f575b00ce2b17e91b59cc868ad7ccac2a07530 -> a1730e1af68de3d9c44ad600a077143309128fc1 [label="develop.txt"]
 	c2f575b00ce2b17e91b59cc868ad7ccac2a07530 -> "95a1fe834d4523c228c9deefcb9cf7f6395216aa" [label="file1.txt"]
 	c2f575b00ce2b17e91b59cc868ad7ccac2a07530 -> "66e9a0d2f63c60d180b5ff437a8231611adaddc6" [label="file2.txt"]

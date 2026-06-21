@@ -231,8 +231,7 @@ class GraphBuilder:
         self._add_edge(dg, parent_id, tree_hexsha, label="tree")
 
         for name, blob_hexsha in td.blob_entries:
-            blob_label = f"{name}\n{blob_hexsha[:hl]}"
-            self._add_node(dg, blob_hexsha, label=blob_label, type_key="blob")
+            self._add_node(dg, blob_hexsha, label=blob_hexsha[:hl], type_key="blob")
             self._add_edge(dg, tree_hexsha, blob_hexsha, label=name)
 
         for child_tree_hexsha in td.child_tree_hexshas:

@@ -760,6 +760,35 @@ def test_verbose_tree_to_blob_edge_uses_blob_entries(repo: RepoTools):
     assert "y.py" in src, "y.py edge label must appear in verbose diagram"
 
 
+def test_verbose_blob_node_label_is_hash_not_filename(repo: RepoTools):
+    """Blob nodes must be labelled with just their short hash, not a filename.
+
+    The filename belongs in the edge label (tree → blob), not the blob node itself.
+    Putting a filename in the blob node label is misleading when multiple files share
+    the same blob SHA -- the node would show whichever filename happened to be
+    processed first, making it look like a file when it's really content-addressed
+    object storage.
+    """
+    repo.write("readme.md", content="hello")
+    sha = repo.commit("add readme")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    cd = graph.commits[sha]
+    td = graph.trees[cd.tree_hexsha]
+    assert td.blob_entries
+    _name, blob_sha = td.blob_entries[0]
+
+    # The node for this blob must be in the graph
+    assert node_in(src, blob_sha), "blob node must exist in verbose diagram"
+
+    # Filename must appear exactly once -- as the edge label, not also in the blob node label
+    assert src.count("readme.md") == 1, (
+        "filename should appear once (on the edge label), not also embedded in the blob node label"
+    )
+
+
 def test_verbose_nested_tree(repo: RepoTools):
     """A subdirectory produces a child tree node connected to the root tree."""
     repo.write("subdir/nested.txt", content="nested")

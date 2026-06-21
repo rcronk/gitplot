@@ -5,8 +5,7 @@ digraph {
 	d985e3fe522b7bdefa3e2f92e61c8e711765b114 [label=d985e color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
 	"2e81171448eb9f2ee3821e3d447aa6b2fe3ddba1" [label="2e811" color="0.444 1.000 1.000" fillcolor="0.444 0.100 1.000" penwidth=2 style=filled]
 	d985e3fe522b7bdefa3e2f92e61c8e711765b114 -> "2e81171448eb9f2ee3821e3d447aa6b2fe3ddba1" [label=tree]
-	ce013625030ba8dba906f756967f9e9ca394464a [label="a.txt
-ce013" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	ce013625030ba8dba906f756967f9e9ca394464a [label=ce013 color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	"2e81171448eb9f2ee3821e3d447aa6b2fe3ddba1" -> ce013625030ba8dba906f756967f9e9ca394464a [label="a.txt"]
 	"refs/heads/main" [label=main color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
 	"refs/heads/main" -> "2ffc39fe3f2ec3a1998a9715d9a456ed74e06b39" [label=branch]
@@ -14,8 +13,7 @@ ce013" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=
 	"18eb80fbbbf9160491c007668d5298f1e86cd40a" [label="18eb8" color="0.444 1.000 1.000" fillcolor="0.444 0.100 1.000" penwidth=2 style=filled]
 	"2ffc39fe3f2ec3a1998a9715d9a456ed74e06b39" -> "18eb80fbbbf9160491c007668d5298f1e86cd40a" [label=tree]
 	"18eb80fbbbf9160491c007668d5298f1e86cd40a" -> ce013625030ba8dba906f756967f9e9ca394464a [label="a.txt"]
-	cc628ccd10742baea8241c5924df992b5c019f71 [label="b.txt
-cc628" color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
+	cc628ccd10742baea8241c5924df992b5c019f71 [label=cc628 color="0.556 1.000 1.000" fillcolor="0.556 0.100 1.000" penwidth=2 style=filled]
 	"18eb80fbbbf9160491c007668d5298f1e86cd40a" -> cc628ccd10742baea8241c5924df992b5c019f71 [label="b.txt"]
 	"2ffc39fe3f2ec3a1998a9715d9a456ed74e06b39" -> d985e3fe522b7bdefa3e2f92e61c8e711765b114 [label=parent]
 }
