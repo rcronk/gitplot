@@ -19,13 +19,13 @@
 
     function refresh() {
       const c = document.getElementById('container');
-      const next = document.createElement('object');
-      next.type = 'image/svg+xml';
+      const next = new Image();
+      next.style.cssText = 'max-width:100%;max-height:100%;';
 
       next.onload = function () {
-        next.style.cssText = 'max-width:100%;max-height:100%;';
-        // replaceChild/appendChild moves next out of body into the container atomically,
-        // so the old SVG remains visible right up to the moment the new one appears.
+        // next is already fully loaded in memory; replaceChild/appendChild
+        // moves it into #container atomically so the old SVG stays visible
+        // right up to the moment the new one appears — no blank frame.
         if (displayed) {
           c.replaceChild(next, displayed);
         } else {
@@ -38,14 +38,10 @@
       };
 
       next.onerror = function () {
-        next.remove();
         setTimeout(refresh, 1000);
       };
 
-      // Preload off-screen: current SVG stays visible while next one loads.
-      next.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
-      document.body.appendChild(next);
-      next.data = SVG + '?t=' + (++seq);
+      next.src = SVG + '?t=' + (++seq);
     }
 
     refresh();

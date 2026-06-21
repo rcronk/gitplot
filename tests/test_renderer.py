@@ -20,29 +20,31 @@ class TestDisplayHtml:
         assert "custom.svg" in html
         assert "{{SVG_FILENAME}}" not in html
 
-    def test_uses_object_element(self, tmp_path: Path) -> None:
-        # <object> loads file:// SVGs without CORS restrictions; fetch() cannot
+    def test_uses_img_not_object(self, tmp_path: Path) -> None:
+        # new Image() / <img> loads file:// SVGs without CORS restrictions.
+        # <object> at 1×1px triggers STATUS_BREAKPOINT in Chrome's SVG renderer.
         html = self._html(tmp_path)
-        assert "createElement('object')" in html or 'createElement("object")' in html
+        assert "new Image()" in html
+        assert "createElement('object')" not in html
+        assert 'createElement("object")' not in html
 
     def test_no_fetch_api(self, tmp_path: Path) -> None:
         # fetch() is blocked by CORS when the page is opened from a file:// URL
-        # (e.g. via file://wsl.localhost/... on WSL2/Windows)
+        # (e.g. file://wsl.localhost/... on WSL2/Windows)
         assert "fetch(" not in self._html(tmp_path)
 
     def test_has_onload_for_flash_free_swap(self, tmp_path: Path) -> None:
-        # onload ensures the new SVG is fully loaded before the old one is removed,
-        # so the user never sees a blank frame between renders
-        assert "onload" in self._html(tmp_path)
-
-    def test_preloads_offscreen_before_swap(self, tmp_path: Path) -> None:
-        # The new <object> is loaded off-screen while the current one remains visible;
-        # only after onload does an atomic replaceChild/appendChild swap occur
-        assert "-9999px" in self._html(tmp_path)
+        # new Image() loads in memory; onload fires when ready, then
+        # replaceChild/appendChild moves it into #container atomically so
+        # the previous SVG stays visible right up to the swap — no blank frame
+        html = self._html(tmp_path)
+        assert "onload" in html
+        assert "replaceChild" in html or "appendChild" in html
 
     def test_default_html_matches_same_contract(self) -> None:
         html = _default_html("gitplot.svg")
-        assert "createElement('object')" in html or 'createElement("object")' in html
+        assert "new Image()" in html
         assert "fetch(" not in html
         assert "onload" in html
-        assert "-9999px" in html
+        assert "createElement('object')" not in html
+        assert 'createElement("object")' not in html
