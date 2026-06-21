@@ -134,7 +134,6 @@ def _default_html(svg_filename: str) -> str:
                font: 12px monospace; flex-shrink: 0; }}
     #container {{ flex: 1; overflow: auto; display: flex;
                   align-items: center; justify-content: center; padding: 8px; }}
-    #container svg {{ max-width: 100%; max-height: 100%; }}
   </style>
 </head>
 <body>
@@ -142,22 +141,40 @@ def _default_html(svg_filename: str) -> str:
   <div id="container"></div>
   <script>
     const SVG = '{svg_filename}';
-    let lastContent = '';
-    async function refresh() {{
-      try {{
-        const r = await fetch(SVG + '?t=' + Date.now());
-        const text = await r.text();
-        if (text !== lastContent) {{
-          lastContent = text;
-          document.getElementById('container').innerHTML = text;
-          document.getElementById('status').textContent =
-            'Updated: ' + new Date().toLocaleTimeString();
+    let seq = 0;
+    let displayed = null;
+
+    function refresh() {{
+      const c = document.getElementById('container');
+      const next = document.createElement('object');
+      next.type = 'image/svg+xml';
+
+      next.onload = function () {{
+        next.style.cssText = 'max-width:100%;max-height:100%;';
+        // replaceChild/appendChild moves next out of body into the container atomically,
+        // so the old SVG remains visible right up to the moment the new one appears.
+        if (displayed) {{
+          c.replaceChild(next, displayed);
+        }} else {{
+          c.appendChild(next);
         }}
-      }} catch (e) {{
-        document.getElementById('status').textContent = 'Error: ' + e.message;
-      }}
-      setTimeout(refresh, 1000);
+        displayed = next;
+        document.getElementById('status').textContent =
+          'Updated: ' + new Date().toLocaleTimeString();
+        setTimeout(refresh, 1000);
+      }};
+
+      next.onerror = function () {{
+        next.remove();
+        setTimeout(refresh, 1000);
+      }};
+
+      // Preload off-screen: current SVG stays visible while next one loads.
+      next.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
+      document.body.appendChild(next);
+      next.data = SVG + '?t=' + (++seq);
     }}
+
     refresh();
   </script>
 </body>

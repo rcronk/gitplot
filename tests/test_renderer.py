@@ -20,26 +20,29 @@ class TestDisplayHtml:
         assert "custom.svg" in html
         assert "{{SVG_FILENAME}}" not in html
 
-    def test_uses_fetch_api(self, tmp_path: Path) -> None:
-        assert "fetch(" in self._html(tmp_path)
-
-    def test_no_object_element_creation(self, tmp_path: Path) -> None:
+    def test_uses_object_element(self, tmp_path: Path) -> None:
+        # <object> loads file:// SVGs without CORS restrictions; fetch() cannot
         html = self._html(tmp_path)
-        assert "createElement('object')" not in html
-        assert 'createElement("object")' not in html
+        assert "createElement('object')" in html or 'createElement("object")' in html
 
-    def test_inline_svg_via_innerhtml(self, tmp_path: Path) -> None:
-        assert "innerHTML" in self._html(tmp_path)
+    def test_no_fetch_api(self, tmp_path: Path) -> None:
+        # fetch() is blocked by CORS when the page is opened from a file:// URL
+        # (e.g. via file://wsl.localhost/... on WSL2/Windows)
+        assert "fetch(" not in self._html(tmp_path)
 
-    def test_content_comparison_before_update(self, tmp_path: Path) -> None:
-        # The page must track previously displayed content and compare before updating.
-        html = self._html(tmp_path)
-        assert "lastContent" in html
+    def test_has_onload_for_flash_free_swap(self, tmp_path: Path) -> None:
+        # onload ensures the new SVG is fully loaded before the old one is removed,
+        # so the user never sees a blank frame between renders
+        assert "onload" in self._html(tmp_path)
+
+    def test_preloads_offscreen_before_swap(self, tmp_path: Path) -> None:
+        # The new <object> is loaded off-screen while the current one remains visible;
+        # only after onload does an atomic replaceChild/appendChild swap occur
+        assert "-9999px" in self._html(tmp_path)
 
     def test_default_html_matches_same_contract(self) -> None:
         html = _default_html("gitplot.svg")
-        assert "fetch(" in html
-        assert "innerHTML" in html
-        assert "lastContent" in html
-        assert "createElement('object')" not in html
-        assert 'createElement("object")' not in html
+        assert "createElement('object')" in html or 'createElement("object")' in html
+        assert "fetch(" not in html
+        assert "onload" in html
+        assert "-9999px" in html
