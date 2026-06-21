@@ -134,6 +134,7 @@ def _default_html(svg_filename: str) -> str:
                font: 12px monospace; flex-shrink: 0; }}
     #container {{ flex: 1; overflow: auto; display: flex;
                   align-items: center; justify-content: center; padding: 8px; }}
+    #container svg {{ max-width: 100%; max-height: 100%; }}
   </style>
 </head>
 <body>
@@ -141,19 +142,20 @@ def _default_html(svg_filename: str) -> str:
   <div id="container"></div>
   <script>
     const SVG = '{svg_filename}';
-    let seq = 0;
-    function refresh() {{
-      const obj = document.createElement('object');
-      obj.type = 'image/svg+xml';
-      obj.data = SVG + '?t=' + (++seq);
-      obj.style.maxWidth = '100%';
-      obj.style.maxHeight = '100%';
-      const c = document.getElementById('container');
-      const old = c.firstChild;
-      c.appendChild(obj);
-      if (old) c.removeChild(old);
-      document.getElementById('status').textContent =
-        'Updated: ' + new Date().toLocaleTimeString();
+    let lastContent = '';
+    async function refresh() {{
+      try {{
+        const r = await fetch(SVG + '?t=' + Date.now());
+        const text = await r.text();
+        if (text !== lastContent) {{
+          lastContent = text;
+          document.getElementById('container').innerHTML = text;
+          document.getElementById('status').textContent =
+            'Updated: ' + new Date().toLocaleTimeString();
+        }}
+      }} catch (e) {{
+        document.getElementById('status').textContent = 'Error: ' + e.message;
+      }}
       setTimeout(refresh, 1000);
     }}
     refresh();
