@@ -230,12 +230,10 @@ class GraphBuilder:
         self._add_node(dg, tree_hexsha, label=tree_hexsha[:hl], type_key="tree")
         self._add_edge(dg, parent_id, tree_hexsha, label="tree")
 
-        for blob_hexsha in td.blob_hexshas:
-            bd = graph.blobs.get(blob_hexsha)
-            if bd:
-                blob_label = f"{bd.name}\n{blob_hexsha[:hl]}"
-                self._add_node(dg, blob_hexsha, label=blob_label, type_key="blob")
-                self._add_edge(dg, tree_hexsha, blob_hexsha, label=bd.name)
+        for name, blob_hexsha in td.blob_entries:
+            blob_label = f"{name}\n{blob_hexsha[:hl]}"
+            self._add_node(dg, blob_hexsha, label=blob_label, type_key="blob")
+            self._add_edge(dg, tree_hexsha, blob_hexsha, label=name)
 
         for child_tree_hexsha in td.child_tree_hexshas:
             self._add_tree_recursive(dg, graph, child_tree_hexsha, tree_hexsha, hl)
@@ -336,7 +334,7 @@ class GraphBuilder:
         )
 
     def _add_edge(self, dg: graphviz.Digraph, from_id: str, to_id: str, label: str = "") -> None:
-        key = (from_id, to_id)
+        key = (from_id, to_id, label)
         if key in self._rendered_edges:
             return
         self._rendered_edges.add(key)

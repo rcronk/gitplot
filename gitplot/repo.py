@@ -67,7 +67,7 @@ class TreeData:
     name: str  # basename; "/" for root
     parent_hexsha: str  # parent commit or tree hexsha
     child_tree_hexshas: list[str] = field(default_factory=list)
-    blob_hexshas: list[str] = field(default_factory=list)
+    blob_entries: list[tuple[str, str]] = field(default_factory=list)  # (name, hexsha)
 
 
 @dataclass
@@ -619,7 +619,7 @@ class GitRepo:
             name=tree.name or "/",
             parent_hexsha=parent_hexsha,
             child_tree_hexshas=[t.hexsha for t in tree.trees],
-            blob_hexshas=[b.hexsha for b in tree.blobs],
+            blob_entries=[(b.name, b.hexsha) for b in tree.blobs],
         )
 
         for blob in tree.blobs:

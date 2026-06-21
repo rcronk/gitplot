@@ -707,11 +707,57 @@ def test_verbose_tree_to_blob_edge(repo: RepoTools):
 
     cd = graph.commits[sha]
     td = graph.trees[cd.tree_hexsha]
-    assert td.blob_hexshas, "Expected at least one blob in the root tree"
-    for blob_sha in td.blob_hexshas:
+    assert td.blob_entries, "Expected at least one blob in the root tree"
+    for _name, blob_sha in td.blob_entries:
         assert edge_in(src, cd.tree_hexsha, blob_sha), (
             f"Expected tree→blob edge {cd.tree_hexsha[:8]} → {blob_sha[:8]}"
         )
+
+
+def test_verbose_all_filenames_shown_when_blobs_share_sha(repo: RepoTools):
+    """All filenames in a tree must appear as edges even when files share the same blob SHA.
+
+    Empty files all hash to e69de29bb.  When a commit adds two empty files, the tree
+    has two entries pointing to the same blob.  Both filenames must still appear as
+    labelled edges in the diagram -- one per tree entry, not one per unique blob SHA.
+    """
+    repo.write("aaa.py", content="")
+    repo.write("bbb.py", content="")
+    sha = repo.commit("two empty files sharing a blob")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    cd = graph.commits[sha]
+    td = graph.trees[cd.tree_hexsha]
+
+    # Data model must preserve (name, sha) pairs, not just unique SHAs
+    names_in_entries = {name for name, _ in td.blob_entries}
+    assert names_in_entries == {"aaa.py", "bbb.py"}, (
+        f"blob_entries must list both filenames; got {names_in_entries}"
+    )
+
+    # Both filenames must appear in the rendered diagram
+    assert "aaa.py" in src, "aaa.py must appear in diagram even when sharing blob SHA with bbb.py"
+    assert "bbb.py" in src, "bbb.py must appear in diagram even when sharing blob SHA with aaa.py"
+
+
+def test_verbose_tree_to_blob_edge_uses_blob_entries(repo: RepoTools):
+    """tree→blob edges must be keyed on (tree, filename), not (tree, blob_sha).
+
+    When a single tree has multiple entries pointing to the same blob SHA, the diagram
+    must draw one edge per filename rather than collapsing them into a single edge.
+    """
+    repo.write("x.py", content="same")
+    repo.write("y.py", content="same")
+    repo.commit("two files same content")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    # Both (tree, name) edges must exist in the DOT source
+    assert "x.py" in src, "x.py edge label must appear in verbose diagram"
+    assert "y.py" in src, "y.py edge label must appear in verbose diagram"
 
 
 def test_verbose_nested_tree(repo: RepoTools):
