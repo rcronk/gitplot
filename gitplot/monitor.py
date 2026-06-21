@@ -118,13 +118,21 @@ class Monitor:
         time.sleep(settle_seconds)
 
     def update(self, node_ids: frozenset[str], drain_seconds: float = 0.3) -> None:
-        """Record node IDs from the most recent render and suppress stat-cache noise.
+        """Record node IDs from the most recent render and reset the event state.
 
-        GitPython read operations (e.g. index diff) trigger git's stat-cache
-        refresh, which writes .git/index.  We suppress only that specific file
-        for drain_seconds so the render does not immediately re-trigger itself.
-        All other events (commit refs, COMMIT_EDITMSG, etc.) pass through
-        immediately so genuine git changes are never lost.
+        Clears the event to remove noise that accumulated during the render:
+        - settle-window residue (events from git-add that re-set the flag during
+          the 500 ms settle, already captured by the render that just finished)
+        - stat-cache updates (.git/index written by GitPython's index reads in
+          verbose mode), which fire during the render and would cause an immediate
+          spurious re-render if left set
+
+        suppress_index() then guards against delayed stat-cache events that arrive
+        after the clear but within drain_seconds.
+
+        Any NEW user changes (git commit, git add, etc.) that happen after the
+        clear will set the event again normally and be picked up by the next wait().
         """
         self.prev_node_ids = node_ids
+        self._event.clear()
         self._handler.suppress_index(drain_seconds)

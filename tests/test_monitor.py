@@ -1,4 +1,4 @@
-"""Tests for Monitor: post-render drain prevents self-induced re-render loops."""
+"""Tests for Monitor: update() clears render-induced events to stop re-render loops."""
 
 from __future__ import annotations
 
@@ -53,17 +53,21 @@ def test_monitor_ignores_output_path(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_update_does_not_drain_non_index_pending_events(tmp_path: Path) -> None:
-    """update() must NOT clear events from non-index paths.
+def test_update_clears_pending_events(tmp_path: Path) -> None:
+    """update() must clear all pending events after a render.
 
-    The old blanket drain caused commits arriving during the drain window to be
-    silently dropped.  Now only .git/index events are suppressed.
+    In verbose mode, get_index_state() reads .git/index, which triggers git's
+    stat-cache refresh and sets the event DURING the render (before update() is
+    called).  Without clearing, every render immediately re-triggers wait(), which
+    triggers another render, causing an infinite loop.  Clearing here is safe
+    because the render already captured the repo state that caused those events;
+    any NEW user changes after the clear will set the event again normally.
     """
     mon = _make_monitor(tmp_path)
     mon._event.set()
     mon.update(frozenset(["node1"]), drain_seconds=0)
-    assert mon._event.is_set(), (
-        "update() must preserve pending events so genuine git changes are not lost"
+    assert not mon._event.is_set(), (
+        "update() must clear pending events to break the render-induced re-trigger loop"
     )
 
 
