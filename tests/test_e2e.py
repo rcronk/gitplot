@@ -278,8 +278,9 @@ def shallow_clone_repo(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, 
     clone_path = tmp_path_factory.mktemp("shallow_clone")
     # Use file:// protocol so git uses the transfer protocol and respects --depth,
     # instead of the default local optimisation that copies all objects via hardlinks.
+    # Path.as_uri() produces the correct file:/// form on both Linux and Windows.
     subprocess.check_output(
-        ["git", "clone", "--depth", "2", f"file://{origin}", str(clone_path)],
+        ["git", "clone", "--depth", "2", origin.as_uri(), str(clone_path)],
         stderr=subprocess.DEVNULL,
     )
     return origin, clone_path
