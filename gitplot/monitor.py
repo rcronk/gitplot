@@ -95,6 +95,14 @@ class Monitor:
         # Drain any events that fired during the settle window
         self._event.clear()
 
-    def update(self, node_ids: frozenset[str]) -> None:
-        """Record the node IDs from the most recent render."""
+    def update(self, node_ids: frozenset[str], drain_seconds: float = 0.3) -> None:
+        """Record node IDs from the most recent render and drain self-induced events.
+
+        GitPython read operations (e.g. index diff) can trigger git's stat-cache
+        refresh, which writes .git/index and fires a watchdog event.  Sleeping
+        briefly after the render lets those events arrive, then clearing the flag
+        prevents them from spuriously re-triggering the loop.
+        """
         self.prev_node_ids = node_ids
+        time.sleep(drain_seconds)
+        self._event.clear()

@@ -239,6 +239,47 @@ def test_verbose_untracked_file(repo: RepoTools):
     assert "new.txt" in dg.source
 
 
+def test_verbose_untracked_edge_connects_to_file_node(repo: RepoTools):
+    """Edge from 'Untracked' must point to the individual file node, not a phantom node."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("new.txt")
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    # The edge must go to the file node, not back to an implicit 'untracked' node
+    assert edge_in(src, "Untracked", "untracked|new.txt"), (
+        "Edge must connect 'Untracked' container to 'untracked|new.txt' file node"
+    )
+    assert node_in(src, "untracked|new.txt"), "Individual untracked file node must exist"
+
+
+def test_verbose_staged_edge_connects_to_file_node(repo: RepoTools):
+    """Edge from 'Staged Changes' must point to the individual file node."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("b.txt", content="staged")
+    repo._run(["git", "add", "b.txt"])
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert edge_in(src, "Staged Changes", "staged|b.txt"), (
+        "Edge must connect 'Staged Changes' to 'staged|b.txt' file node"
+    )
+    assert node_in(src, "staged|b.txt"), "Individual staged file node must exist"
+
+
+def test_verbose_unstaged_edge_connects_to_file_node(repo: RepoTools):
+    """Edge from 'Unstaged Changes' must point to the individual file node."""
+    repo.write("a.txt", content="original")
+    repo.commit("first")
+    repo.write("a.txt", content="modified")
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert edge_in(src, "Unstaged Changes", "unstaged|a.txt"), (
+        "Edge must connect 'Unstaged Changes' to 'unstaged|a.txt' file node"
+    )
+    assert node_in(src, "unstaged|a.txt"), "Individual unstaged file node must exist"
+
+
 # ---------------------------------------------------------------------------
 # Branch mode
 # ---------------------------------------------------------------------------
@@ -330,20 +371,49 @@ def test_branch_mode_single_branch(repo: RepoTools):
 # ---------------------------------------------------------------------------
 
 
-def test_highlight_ids_applied(repo: RepoTools):
-    """Nodes in highlight_ids receive the new_node color style."""
+def test_highlight_new_node_not_in_prev_render(repo: RepoTools):
+    """Nodes absent from highlight_ids (prev render) receive the new_node color."""
+    repo.write("a.txt")
+    repo.commit("first")
+    from gitplot.colors import SCHEME
+
+    # Pass an empty frozenset as highlight_ids (prev render had no nodes).
+    # sha is NOT in the prev render, so it should be highlighted.
+    dg, _, _, _ = _build(str(repo.path), highlight_ids=frozenset())
+    new_fill = SCHEME["new_node"].fill
+    assert new_fill in dg.source, "New node (not in prev render) must use new_node fill color"
+
+
+def test_highlight_old_node_not_highlighted(repo: RepoTools):
+    """Nodes present in highlight_ids (prev render) keep their normal color."""
     repo.write("a.txt")
     sha = repo.commit("first")
+    from gitplot.colors import SCHEME
 
-    # Pretend sha is a NEW node (not in prev render)
-    # highlight_ids contains the PREVIOUS render's nodes; new nodes are those NOT in it.
-    # So pass empty set as highlight_ids to mark nothing as new.
-    # To mark sha as highlighted, we need to use it differently:
-    # highlight_ids in GraphBuilder marks nodes that ARE new (not in prev render).
-    dg, _, _, _ = _build(str(repo.path), highlight_ids={sha})
-    # The sha node should use the new_node color scheme (golden fill)
-    # Check that the node is present (it was highlighted)
-    assert node_in(dg.source, sha)
+    # Pass sha as already known (in the previous render) — it should NOT be highlighted.
+    dg, _, _, _ = _build(str(repo.path), highlight_ids=frozenset({sha}))
+    new_fill = SCHEME["new_node"].fill
+    # The commit node is sha; it's in highlight_ids so it should use normal commit color.
+    commit_fill = SCHEME["commit"].fill
+    assert commit_fill in dg.source, "Known node (in prev render) must keep commit fill color"
+    # sha's node should not use new_node fill when it's a known node and is the ONLY node
+    # (all other nodes like refs would still be new, so just check sha's own attrs)
+    src = dg.source
+    # The sha node line should contain commit fill, not new_node fill
+    sha_line = next((ln for ln in src.splitlines() if sha[:5] in ln and "fillcolor" in ln), None)
+    assert sha_line is not None
+    assert new_fill not in sha_line, "sha node (in prev render) must not use new_node fill"
+
+
+def test_highlight_none_disables_highlighting(repo: RepoTools):
+    """When highlight_ids is None, no node receives the new_node color."""
+    repo.write("a.txt")
+    repo.commit("first")
+    from gitplot.colors import SCHEME
+
+    dg, _, _, _ = _build(str(repo.path), highlight_ids=None)
+    new_fill = SCHEME["new_node"].fill
+    assert new_fill not in dg.source, "highlight_ids=None must produce no highlighted nodes"
 
 
 # ---------------------------------------------------------------------------
