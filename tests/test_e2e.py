@@ -233,10 +233,12 @@ def complex_e2e_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
     r.add("develop.txt")
     r.stash("wip: experiment")
 
-    # Working tree state for verbose-mode tests
-    (base / "scratch.txt").write_text("not tracked\n", encoding="utf-8")
-    (base / "develop.txt").write_text("unstaged modification\n", encoding="utf-8")
-    (base / "index_file.txt").write_text("staged content\n", encoding="utf-8")
+    # Working tree state for verbose-mode tests.
+    # write_bytes guarantees LF on all platforms; write_text on Windows would
+    # produce CRLF, changing workspace_hexsha and breaking cross-platform golden files.
+    (base / "scratch.txt").write_bytes(b"not tracked\n")
+    (base / "develop.txt").write_bytes(b"unstaged modification\n")
+    (base / "index_file.txt").write_bytes(b"staged content\n")
     subprocess.check_output(["git", "add", "index_file.txt"], cwd=base, stderr=subprocess.DEVNULL)
 
     return base
@@ -278,8 +280,9 @@ def shallow_clone_repo(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, 
     clone_path = tmp_path_factory.mktemp("shallow_clone")
     # Use file:// protocol so git uses the transfer protocol and respects --depth,
     # instead of the default local optimisation that copies all objects via hardlinks.
+    # Path.as_uri() produces the correct file:/// form on both Linux and Windows.
     subprocess.check_output(
-        ["git", "clone", "--depth", "2", f"file://{origin}", str(clone_path)],
+        ["git", "clone", "--depth", "2", origin.as_uri(), str(clone_path)],
         stderr=subprocess.DEVNULL,
     )
     return origin, clone_path
