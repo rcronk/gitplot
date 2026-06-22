@@ -41,6 +41,9 @@ coverage.xml
 # macOS
 .DS_Store
 
+# graphify generated output (regenerate locally with: graphify update .)
+graphify-out/
+
 # gitplot output files (default output-path and HTML viewer)
 # Intentionally specific — docs/screenshots/*.svg are tracked and must not be ignored.
 gitplot.svg
