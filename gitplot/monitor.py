@@ -26,10 +26,29 @@ class _RepoEventHandler(FileSystemEventHandler):
         super().__init__()
         self._event = change_event
         self._ignore_paths = ignore_paths  # absolute path strings to skip
+        self._suppress_index_until: float = 0.0
+
+    def suppress_index(self, duration: float) -> None:
+        """Suppress .git/index events for duration seconds.
+
+        GitPython's repo reads trigger git's stat-cache refresh, which writes
+        .git/index.  Suppressing that file specifically (not all events) prevents
+        a render from looping back on itself while still letting commit events
+        (.git/refs/heads/*, COMMIT_EDITMSG, etc.) pass through immediately.
+        """
+        self._suppress_index_until = time.monotonic() + duration
 
     def _handle(self, event_path: str) -> None:
         abs_path = str(Path(event_path).resolve())
         if abs_path in self._ignore_paths:
+            return
+        p = Path(abs_path)
+        if (
+            p.name == "index"
+            and p.parent.name == ".git"
+            and time.monotonic() < self._suppress_index_until
+        ):
+            log.debug("Suppressed .git/index event (GitPython stat-cache noise)")
             return
         log.debug("Change detected: %s", event_path)
         self._event.set()
@@ -87,14 +106,33 @@ class Monitor:
             self._observer = None
 
     def wait(self, settle_seconds: float = 0.5) -> None:
-        """Block until a change is detected, then let the repo settle."""
+        """Block until a change is detected, then let the repo settle.
+
+        Events that arrive during the settle window are intentionally preserved:
+        a 'git commit' immediately following 'git add' fires during this window,
+        and draining it would cause the commit to be invisible until the next
+        unrelated change.
+        """
         self._event.wait()
         self._event.clear()
-        # Wait briefly for any rapid burst of events to finish
         time.sleep(settle_seconds)
-        # Drain any events that fired during the settle window
-        self._event.clear()
 
-    def update(self, node_ids: frozenset[str]) -> None:
-        """Record the node IDs from the most recent render."""
+    def update(self, node_ids: frozenset[str], drain_seconds: float = 0.3) -> None:
+        """Record node IDs from the most recent render and reset the event state.
+
+        Clears the event to remove noise that accumulated during the render:
+        - settle-window residue (events from git-add that re-set the flag during
+          the 500 ms settle, already captured by the render that just finished)
+        - stat-cache updates (.git/index written by GitPython's index reads in
+          verbose mode), which fire during the render and would cause an immediate
+          spurious re-render if left set
+
+        suppress_index() then guards against delayed stat-cache events that arrive
+        after the clear but within drain_seconds.
+
+        Any NEW user changes (git commit, git add, etc.) that happen after the
+        clear will set the event again normally and be picked up by the next wait().
+        """
         self.prev_node_ids = node_ids
+        self._event.clear()
+        self._handler.suppress_index(drain_seconds)

@@ -1,0 +1,34 @@
+digraph {
+	graph [rankdir=RL]
+	develop [label="HEAD->develop" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"feature/alpha" [label="feature/alpha" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"feature/beta" [label="feature/beta" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	main [label=main color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"v0.1" [label="v0.1" color="0.111 1.000 1.000" fillcolor="0.111 0.100 1.000" penwidth=2 style=filled]
+	"v1.0" [label="v1.0" color="0.111 1.000 1.000" fillcolor="0.111 0.100 1.000" penwidth=2 style=filled]
+	"stash@{0}" [label="stash@{0}" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	FETCH_HEAD [label=FETCH_HEAD color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"0b18da950bf84d50fbc7562a4747f13094fc85df" [label="fork
+0b18da95" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"717b8ae6fe822a635bb36b718f6a7cb2a27863a5" [label="fork
+717b8ae6" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"790db164f18098ef413853e56f7d93e70a2c187a" [label="fork
+790db164" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"8a510ae66f449135f143a5099d7f7c8755c8fe9a" [label="fork
+8a510ae6" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	d18f056029432df7a41eacf452447a111f0f4a12 [label="fork
+d18f0560" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"0b18da950bf84d50fbc7562a4747f13094fc85df" -> develop [label=""]
+	"0b18da950bf84d50fbc7562a4747f13094fc85df" -> "feature/beta" [label=""]
+	"790db164f18098ef413853e56f7d93e70a2c187a" -> "stash@{0}" [label=""]
+	"8a510ae66f449135f143a5099d7f7c8755c8fe9a" -> "feature/alpha" [label=""]
+	"717b8ae6fe822a635bb36b718f6a7cb2a27863a5" -> "v1.0" [label=""]
+	d18f056029432df7a41eacf452447a111f0f4a12 -> main [label=""]
+	"v0.1" -> FETCH_HEAD [label=""]
+	"feature/alpha" -> "717b8ae6fe822a635bb36b718f6a7cb2a27863a5" [label=""]
+	main -> "8a510ae66f449135f143a5099d7f7c8755c8fe9a" [label=""]
+	d18f056029432df7a41eacf452447a111f0f4a12 -> "v0.1" [label=""]
+	"v1.0" -> "0b18da950bf84d50fbc7562a4747f13094fc85df" [label=""]
+	develop -> "790db164f18098ef413853e56f7d93e70a2c187a" [label=""]
+	d18f056029432df7a41eacf452447a111f0f4a12 -> FETCH_HEAD [label=""]
+}

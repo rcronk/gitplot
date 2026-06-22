@@ -1,0 +1,59 @@
+digraph {
+	graph [rankdir=RL]
+	HEAD [label=HEAD color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	HEAD -> "refs/heads/develop" [label=HEAD]
+	"refs/heads/develop" [label=develop color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"refs/heads/develop" -> "790db164f18098ef413853e56f7d93e70a2c187a" [label=branch]
+	"790db164f18098ef413853e56f7d93e70a2c187a" [label="commit
+790db" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"790db164f18098ef413853e56f7d93e70a2c187a" -> "0b18da950bf84d50fbc7562a4747f13094fc85df" [label=parent]
+	"0b18da950bf84d50fbc7562a4747f13094fc85df" [label="commit
+0b18d" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"0b18da950bf84d50fbc7562a4747f13094fc85df" -> "34f5775c53e87185c6f0c5342e74c9f9d9a06c40" [label=parent]
+	"34f5775c53e87185c6f0c5342e74c9f9d9a06c40" [label="b8e06 (2) 34f57" color="0.333 1.000 1.000" fillcolor="0.333 0.100 1.000" penwidth=2 style=filled]
+	"34f5775c53e87185c6f0c5342e74c9f9d9a06c40" -> de59f3a1667fc051ccc0b0682694585e36040bf4 [label=parent]
+	de59f3a1667fc051ccc0b0682694585e36040bf4 [label="commit
+de59f" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	de59f3a1667fc051ccc0b0682694585e36040bf4 -> "9d7c9410192654b9445d1935283210dbfa43d722" [label=parent]
+	de59f3a1667fc051ccc0b0682694585e36040bf4 -> "717b8ae6fe822a635bb36b718f6a7cb2a27863a5" [label=parent]
+	"717b8ae6fe822a635bb36b718f6a7cb2a27863a5" [label="commit
+717b8" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"717b8ae6fe822a635bb36b718f6a7cb2a27863a5" -> "98c0271fb08e9ec656af44e1ce7e1f310d722f3b" [label=parent]
+	"98c0271fb08e9ec656af44e1ce7e1f310d722f3b" [label="commit
+98c02" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"98c0271fb08e9ec656af44e1ce7e1f310d722f3b" -> "9d7c9410192654b9445d1935283210dbfa43d722" [label=parent]
+	"9d7c9410192654b9445d1935283210dbfa43d722" [label="commit
+9d7c9" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"9d7c9410192654b9445d1935283210dbfa43d722" -> "8a510ae66f449135f143a5099d7f7c8755c8fe9a" [label=parent]
+	"8a510ae66f449135f143a5099d7f7c8755c8fe9a" [label="commit
+8a510" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"8a510ae66f449135f143a5099d7f7c8755c8fe9a" -> "615f48cc20ab3061238d022c49147045241a004f" [label=parent]
+	"615f48cc20ab3061238d022c49147045241a004f" [label="commit
+615f4" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"615f48cc20ab3061238d022c49147045241a004f" -> d18f056029432df7a41eacf452447a111f0f4a12 [label=parent]
+	d18f056029432df7a41eacf452447a111f0f4a12 [label="commit
+d18f0" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"refs/heads/feature/alpha" [label="feature/alpha" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"refs/heads/feature/alpha" -> "717b8ae6fe822a635bb36b718f6a7cb2a27863a5" [label=branch]
+	"refs/heads/feature/beta" [label="feature/beta" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"refs/heads/feature/beta" -> eb852ccf183082960915022040318f9549283f89 [label=branch]
+	eb852ccf183082960915022040318f9549283f89 [label="commit
+eb852" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	eb852ccf183082960915022040318f9549283f89 -> "886fab2b89c493ab873baa91ecb1438da7321edc" [label=parent]
+	"886fab2b89c493ab873baa91ecb1438da7321edc" [label="commit
+886fa" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"886fab2b89c493ab873baa91ecb1438da7321edc" -> "0b18da950bf84d50fbc7562a4747f13094fc85df" [label=parent]
+	"refs/heads/main" [label=main color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"refs/heads/main" -> "8a510ae66f449135f143a5099d7f7c8755c8fe9a" [label=branch]
+	"refs/tags/v0.1" [label="tag
+v0.1" color="0.111 1.000 1.000" fillcolor="0.111 0.100 1.000" penwidth=2 style=filled]
+	"refs/tags/v0.1" -> d18f056029432df7a41eacf452447a111f0f4a12 [label=tag]
+	"refs/tags/v1.0" [label="tag
+v1.0" color="0.111 1.000 1.000" fillcolor="0.111 0.100 1.000" penwidth=2 style=filled]
+	"68ab57a3957981ada1d7d99f5ed25152cf0c89d8" [label="tag
+68ab5" color="0.111 1.000 1.000" fillcolor="0.111 0.100 1.000" penwidth=2 style=filled]
+	"refs/tags/v1.0" -> "68ab57a3957981ada1d7d99f5ed25152cf0c89d8" [label=tag]
+	"68ab57a3957981ada1d7d99f5ed25152cf0c89d8" -> de59f3a1667fc051ccc0b0682694585e36040bf4 [label=commit]
+	FETCH_HEAD [label=FETCH_HEAD color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	FETCH_HEAD -> d18f056029432df7a41eacf452447a111f0f4a12 [label=remote]
+}

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from gitplot.repo import GitRepo
 
 from .conftest import RepoTools
@@ -235,3 +237,25 @@ def test_verbose_includes_blobs(repo: RepoTools):
     graph = GitRepo(str(repo.path)).build_graph(include_trees=True)
     # At least one blob should exist
     assert len(graph.blobs) > 0
+
+
+def test_workspace_hexsha_is_raw_blob_sha(repo: RepoTools):
+    """workspace_hexsha must be the git blob SHA of the file's exact bytes.
+
+    Use write_bytes (not write_text) to guarantee LF on all platforms; text
+    mode on Windows converts \\n to \\r\\n, which changes the SHA and breaks
+    cross-platform golden-file comparisons.
+    """
+    (repo.path / "a.txt").write_bytes(b"original content\n")
+    repo.add("a.txt")
+    repo.commit("first")
+
+    new_content = b"modified content\n"
+    (repo.path / "a.txt").write_bytes(new_content)
+
+    idx = GitRepo(str(repo.path)).get_index_state()
+    assert len(idx.unstaged) == 1
+    uf = idx.unstaged[0]
+
+    expected_sha = hashlib.sha1(b"blob %d\0" % len(new_content) + new_content).hexdigest()
+    assert uf.workspace_hexsha == expected_sha

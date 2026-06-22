@@ -15,20 +15,35 @@
   <script>
     const SVG = '{{SVG_FILENAME}}';
     let seq = 0;
+    let displayed = null;
+
     function refresh() {
-      const obj = document.createElement('object');
-      obj.type = 'image/svg+xml';
-      obj.data = SVG + '?t=' + (++seq);
-      obj.style.maxWidth = '100%';
-      obj.style.maxHeight = '100%';
       const c = document.getElementById('container');
-      const old = c.firstChild;
-      c.appendChild(obj);
-      if (old) c.removeChild(old);
-      document.getElementById('status').textContent =
-        'Updated: ' + new Date().toLocaleTimeString();
-      setTimeout(refresh, 1000);
+      const next = new Image();
+      next.style.cssText = 'max-width:100%;max-height:100%;';
+
+      next.onload = function () {
+        // next is already fully loaded in memory; replaceChild/appendChild
+        // moves it into #container atomically so the old SVG stays visible
+        // right up to the moment the new one appears -- no blank frame.
+        if (displayed) {
+          c.replaceChild(next, displayed);
+        } else {
+          c.appendChild(next);
+        }
+        displayed = next;
+        document.getElementById('status').textContent =
+          'Updated: ' + new Date().toLocaleTimeString();
+        setTimeout(refresh, 1000);
+      };
+
+      next.onerror = function () {
+        setTimeout(refresh, 1000);
+      };
+
+      next.src = SVG + '?t=' + (++seq);
     }
+
     refresh();
   </script>
 </body>

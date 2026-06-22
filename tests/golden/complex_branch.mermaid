@@ -1,0 +1,40 @@
+flowchart RL
+    develop["HEAD->develop"]
+    feature_alpha["feature/alpha"]
+    feature_beta["feature/beta"]
+    main["main"]
+    v0_1["v0.1"]
+    v1_0["v1.0"]
+    stash__0_["stash@{0}"]
+    FETCH_HEAD["FETCH_HEAD"]
+    0b18da950bf84d50fbc7562a4747f13094fc85df["fork<br/>0b18da95"]
+    717b8ae6fe822a635bb36b718f6a7cb2a27863a5["fork<br/>717b8ae6"]
+    790db164f18098ef413853e56f7d93e70a2c187a["fork<br/>790db164"]
+    8a510ae66f449135f143a5099d7f7c8755c8fe9a["fork<br/>8a510ae6"]
+    d18f056029432df7a41eacf452447a111f0f4a12["fork<br/>d18f0560"]
+    0b18da950bf84d50fbc7562a4747f13094fc85df --> develop
+    0b18da950bf84d50fbc7562a4747f13094fc85df --> feature_beta
+    790db164f18098ef413853e56f7d93e70a2c187a --> stash__0_
+    8a510ae66f449135f143a5099d7f7c8755c8fe9a --> feature_alpha
+    717b8ae6fe822a635bb36b718f6a7cb2a27863a5 --> v1_0
+    d18f056029432df7a41eacf452447a111f0f4a12 --> main
+    v0_1 --> FETCH_HEAD
+    feature_alpha --> 717b8ae6fe822a635bb36b718f6a7cb2a27863a5
+    main --> 8a510ae66f449135f143a5099d7f7c8755c8fe9a
+    d18f056029432df7a41eacf452447a111f0f4a12 --> v0_1
+    v1_0 --> 0b18da950bf84d50fbc7562a4747f13094fc85df
+    develop --> 790db164f18098ef413853e56f7d93e70a2c187a
+    d18f056029432df7a41eacf452447a111f0f4a12 --> FETCH_HEAD
+    style develop fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style feature_alpha fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style feature_beta fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style main fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style v0_1 fill:#fff6e5,stroke:#ffa900,stroke-width:2px
+    style v1_0 fill:#fff6e5,stroke:#ffa900,stroke-width:2px
+    style stash__0_ fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style FETCH_HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style 0b18da950bf84d50fbc7562a4747f13094fc85df fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
+    style 717b8ae6fe822a635bb36b718f6a7cb2a27863a5 fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
+    style 790db164f18098ef413853e56f7d93e70a2c187a fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
+    style 8a510ae66f449135f143a5099d7f7c8755c8fe9a fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
+    style d18f056029432df7a41eacf452447a111f0f4a12 fill:#f6ffe5,stroke:#aaff00,stroke-width:2px

@@ -29,7 +29,8 @@ main ← develop ← feature/<issue-number>-short-description
 ## Running checks locally
 
 ```bash
-pip install -e ".[dev]"       # install with dev extras
+pip install -e ".[dev]"       # install with dev extras (includes graphifyy)
+graphify update .             # build local knowledge graph (AST-only, no API key needed)
 ruff check .                  # lint
 ruff format --check .         # format check (use ruff format . to fix)
 pytest -v                     # run all tests
@@ -47,8 +48,13 @@ System dependency: `graphviz` (`apt install graphviz` / `brew install graphviz`)
 | `gitplot/renderer.py` | Renders the digraph to output (SVG, PNG, PDF, HTML, Mermaid) |
 | `gitplot/monitor.py` | Watchdog-based monitor mode |
 | `gitplot/colors.py` | Color constants and highlight logic |
-| `tests/conftest.py` | Shared pytest fixtures (in-memory git repos via GitPython) |
-| `tests/test_builder.py` | Main test suite — 53+ tests covering all three modes |
+| `tests/conftest.py` | Shared pytest fixtures (in-memory git repos via GitPython); `node_in`/`edge_in` DOT-source helpers |
+| `tests/test_builder.py` | Structural tests — node/edge presence for all three modes and highlight logic |
+| `tests/test_e2e.py` | E2E golden-file tests; run `pytest --update-golden` to regenerate after intentional output changes |
+| `tests/test_monitor.py` | Monitor drain and event-filtering tests |
+| `tests/test_repo.py` | GitRepo data-model unit tests |
+| `tests/test_mermaid.py` | Mermaid output unit tests |
+| `tests/golden/` | Reference DOT/Mermaid snapshots compared by test_e2e.py |
 
 ## Key conventions
 
@@ -57,6 +63,9 @@ System dependency: `graphviz` (`apt install graphviz` / `brew install graphviz`)
 - Helper functions `node_in(source, id)` and `edge_in(source, from_id, to_id)` are in `conftest.py` for asserting DOT source content.
 - `_BRANCH_PRIORITY` in `repo.py` defines which branch is "parent" when two branches share the same commit SHA (used in branch topology).
 - Boring commit collapse: a commit with one parent, one child, and no refs is collapsed into a summary node showing `LAST (N) FIRST`.
+- **No non-ASCII characters in source code.** Use `->`, `--`, `...` instead of `→`, `—`, `…`. The CI `checks` job does not enforce this yet, but ruff will catch them indirectly and they cause encoding issues on some terminals.
+- **Node ID separator is `|`, not `:`.** The graphviz Python library's `_quote_edge()` splits on `:` and treats the suffix as a DOT port name, so any node ID with a `:` in it generates a wrong edge target. Staged/unstaged/untracked file nodes use `f"staged|{path}"` etc.
+- **Golden-file updates:** after any intentional change to DOT or Mermaid output, run `pytest tests/test_e2e.py --update-golden` to regenerate the snapshots, then commit the updated files alongside the code change.
 
 ## Merge methods reminder
 
@@ -64,3 +73,13 @@ System dependency: `graphviz` (`apt install graphviz` / `brew install graphviz`)
 |----|---------------------------|
 | `feature/*` → `develop` | **Squash and merge** |
 | `develop` → `main` | **Create a merge commit** |
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

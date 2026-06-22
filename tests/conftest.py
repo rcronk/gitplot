@@ -10,6 +10,36 @@ from pathlib import Path
 
 import pytest
 
+GOLDEN_DIR = Path(__file__).parent / "golden"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--update-golden",
+        action="store_true",
+        default=False,
+        help="Regenerate golden files instead of comparing against them.",
+    )
+
+
+def compare_golden(request: pytest.FixtureRequest, name: str, content: str) -> None:
+    """Assert content matches tests/golden/<name>, or write it if --update-golden."""
+    golden_path = GOLDEN_DIR / name
+    if request.config.getoption("--update-golden"):
+        GOLDEN_DIR.mkdir(exist_ok=True)
+        golden_path.write_text(content, encoding="utf-8")
+        pytest.skip(f"Golden file written: {name}")
+        return
+    if not golden_path.exists():
+        pytest.fail(
+            f"Golden file missing: {golden_path}\nRun: pytest --update-golden  to generate it."
+        )
+    expected = golden_path.read_text(encoding="utf-8")
+    assert content == expected, (
+        f"Output doesn't match golden file {name!r}.\n"
+        "If the change is intentional, run: pytest --update-golden"
+    )
+
 
 class RepoTools:
     """Builds a temporary git repository for use in tests."""

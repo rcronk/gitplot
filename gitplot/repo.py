@@ -67,7 +67,7 @@ class TreeData:
     name: str  # basename; "/" for root
     parent_hexsha: str  # parent commit or tree hexsha
     child_tree_hexshas: list[str] = field(default_factory=list)
-    blob_hexshas: list[str] = field(default_factory=list)
+    blob_entries: list[tuple[str, str]] = field(default_factory=list)  # (name, hexsha)
 
 
 @dataclass
@@ -619,7 +619,7 @@ class GitRepo:
             name=tree.name or "/",
             parent_hexsha=parent_hexsha,
             child_tree_hexshas=[t.hexsha for t in tree.trees],
-            blob_hexshas=[b.hexsha for b in tree.blobs],
+            blob_entries=[(b.name, b.hexsha) for b in tree.blobs],
         )
 
         for blob in tree.blobs:
@@ -796,9 +796,11 @@ class GitRepo:
                         BranchEdge(from_id=branch_name, to_id=best_fork, from_is_fork=False)
                     )
 
-        # Build fork node list (only forks actually referenced by edges)
+        # Build fork node list (only forks actually referenced by edges).
+        # Sort by hexsha so the output order is deterministic across processes
+        # (set iteration order is randomised by Python's hash seed).
         fork_commit_nodes: list[ForkCommitNode] = []
-        for hexsha in used_fork_hexshas:
+        for hexsha in sorted(used_fork_hexshas):
             base = forks[hexsha]
             fork_commit_nodes.append(
                 ForkCommitNode(

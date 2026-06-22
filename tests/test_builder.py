@@ -188,6 +188,73 @@ def test_commit_details_flag(repo: RepoTools):
 
 
 # ---------------------------------------------------------------------------
+# Node type-prefix labels (commit/tree/blob/tag)
+# ---------------------------------------------------------------------------
+
+
+def test_commit_node_label_has_type_prefix(repo: RepoTools):
+    """Commit nodes must be labelled with 'commit' on the first line, hash on the second."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    dg, _, _, _ = _build(str(repo.path))
+    # graphviz renders \n as a real newline in the DOT source string
+    assert f"commit\n{sha[:5]}" in dg.source, (
+        "commit node label must start with 'commit' on the first line"
+    )
+
+
+def test_commit_details_type_prefix_preserved(repo: RepoTools):
+    """With --commit-details, the type prefix must still appear before the hash."""
+    repo.write("a.txt")
+    sha = repo.commit("my message")
+    dg, _, _, _ = _build(str(repo.path), commit_details=True)
+    assert f"commit\n{sha[:5]}" in dg.source
+    assert "my message" in dg.source
+
+
+def test_tree_node_label_has_type_prefix(repo: RepoTools):
+    """Tree nodes in verbose mode must be labelled with 'tree' on the first line."""
+    repo.write("a.txt", content="x")
+    repo.commit("first")
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    tree_sha = next(iter(graph.trees))
+    assert f"tree\n{tree_sha[:5]}" in dg.source, (
+        "tree node label must start with 'tree' on the first line"
+    )
+
+
+def test_blob_node_label_has_type_prefix(repo: RepoTools):
+    """Blob nodes in verbose mode must be labelled with 'blob' on the first line."""
+    repo.write("a.txt", content="x")
+    repo.commit("first")
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    blob_sha = next(iter(graph.blobs))
+    assert f"blob\n{blob_sha[:5]}" in dg.source, (
+        "blob node label must start with 'blob' on the first line"
+    )
+
+
+def test_tag_node_label_has_type_prefix(repo: RepoTools):
+    """Tag ref nodes must be labelled with 'tag' on the first line."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.tag("v1.0")
+    dg, _, _, _ = _build(str(repo.path))
+    assert "tag\nv1.0" in dg.source, "tag node label must start with 'tag' on the first line"
+
+
+def test_annotated_tag_node_label_has_type_prefix(repo: RepoTools):
+    """Annotated tag ref nodes must also carry the 'tag' prefix line."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.tag("v2.0", annotated=True, message="Release")
+    dg, _, _, _ = _build(str(repo.path))
+    assert "tag\nv2.0" in dg.source, (
+        "annotated tag ref node label must start with 'tag' on the first line"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Verbose mode
 # ---------------------------------------------------------------------------
 
@@ -237,6 +304,47 @@ def test_verbose_untracked_file(repo: RepoTools):
     dg, _, _, _ = _build(str(repo.path), mode="verbose")
     assert "Untracked" in dg.source
     assert "new.txt" in dg.source
+
+
+def test_verbose_untracked_edge_connects_to_file_node(repo: RepoTools):
+    """Edge from 'Untracked' must point to the individual file node, not a phantom node."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("new.txt")
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    # The edge must go to the file node, not back to an implicit 'untracked' node
+    assert edge_in(src, "Untracked", "untracked|new.txt"), (
+        "Edge must connect 'Untracked' container to 'untracked|new.txt' file node"
+    )
+    assert node_in(src, "untracked|new.txt"), "Individual untracked file node must exist"
+
+
+def test_verbose_staged_edge_connects_to_file_node(repo: RepoTools):
+    """Edge from 'Staged Changes' must point to the individual file node."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("b.txt", content="staged")
+    repo._run(["git", "add", "b.txt"])
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert edge_in(src, "Staged Changes", "staged|b.txt"), (
+        "Edge must connect 'Staged Changes' to 'staged|b.txt' file node"
+    )
+    assert node_in(src, "staged|b.txt"), "Individual staged file node must exist"
+
+
+def test_verbose_unstaged_edge_connects_to_file_node(repo: RepoTools):
+    """Edge from 'Unstaged Changes' must point to the individual file node."""
+    repo.write("a.txt", content="original")
+    repo.commit("first")
+    repo.write("a.txt", content="modified")
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert edge_in(src, "Unstaged Changes", "unstaged|a.txt"), (
+        "Edge must connect 'Unstaged Changes' to 'unstaged|a.txt' file node"
+    )
+    assert node_in(src, "unstaged|a.txt"), "Individual unstaged file node must exist"
 
 
 # ---------------------------------------------------------------------------
@@ -330,20 +438,49 @@ def test_branch_mode_single_branch(repo: RepoTools):
 # ---------------------------------------------------------------------------
 
 
-def test_highlight_ids_applied(repo: RepoTools):
-    """Nodes in highlight_ids receive the new_node color style."""
+def test_highlight_new_node_not_in_prev_render(repo: RepoTools):
+    """Nodes absent from highlight_ids (prev render) receive the new_node color."""
+    repo.write("a.txt")
+    repo.commit("first")
+    from gitplot.colors import SCHEME
+
+    # Pass an empty frozenset as highlight_ids (prev render had no nodes).
+    # sha is NOT in the prev render, so it should be highlighted.
+    dg, _, _, _ = _build(str(repo.path), highlight_ids=frozenset())
+    new_fill = SCHEME["new_node"].fill
+    assert new_fill in dg.source, "New node (not in prev render) must use new_node fill color"
+
+
+def test_highlight_old_node_not_highlighted(repo: RepoTools):
+    """Nodes present in highlight_ids (prev render) keep their normal color."""
     repo.write("a.txt")
     sha = repo.commit("first")
+    from gitplot.colors import SCHEME
 
-    # Pretend sha is a NEW node (not in prev render)
-    # highlight_ids contains the PREVIOUS render's nodes; new nodes are those NOT in it.
-    # So pass empty set as highlight_ids to mark nothing as new.
-    # To mark sha as highlighted, we need to use it differently:
-    # highlight_ids in GraphBuilder marks nodes that ARE new (not in prev render).
-    dg, _, _, _ = _build(str(repo.path), highlight_ids={sha})
-    # The sha node should use the new_node color scheme (golden fill)
-    # Check that the node is present (it was highlighted)
-    assert node_in(dg.source, sha)
+    # Pass sha as already known (in the previous render) — it should NOT be highlighted.
+    dg, _, _, _ = _build(str(repo.path), highlight_ids=frozenset({sha}))
+    new_fill = SCHEME["new_node"].fill
+    # The commit node is sha; it's in highlight_ids so it should use normal commit color.
+    commit_fill = SCHEME["commit"].fill
+    assert commit_fill in dg.source, "Known node (in prev render) must keep commit fill color"
+    # sha's node should not use new_node fill when it's a known node and is the ONLY node
+    # (all other nodes like refs would still be new, so just check sha's own attrs)
+    src = dg.source
+    # The sha node line should contain commit fill, not new_node fill
+    sha_line = next((ln for ln in src.splitlines() if sha[:5] in ln and "fillcolor" in ln), None)
+    assert sha_line is not None
+    assert new_fill not in sha_line, "sha node (in prev render) must not use new_node fill"
+
+
+def test_highlight_none_disables_highlighting(repo: RepoTools):
+    """When highlight_ids is None, no node receives the new_node color."""
+    repo.write("a.txt")
+    repo.commit("first")
+    from gitplot.colors import SCHEME
+
+    dg, _, _, _ = _build(str(repo.path), highlight_ids=None)
+    new_fill = SCHEME["new_node"].fill
+    assert new_fill not in dg.source, "highlight_ids=None must produce no highlighted nodes"
 
 
 # ---------------------------------------------------------------------------
@@ -637,11 +774,86 @@ def test_verbose_tree_to_blob_edge(repo: RepoTools):
 
     cd = graph.commits[sha]
     td = graph.trees[cd.tree_hexsha]
-    assert td.blob_hexshas, "Expected at least one blob in the root tree"
-    for blob_sha in td.blob_hexshas:
+    assert td.blob_entries, "Expected at least one blob in the root tree"
+    for _name, blob_sha in td.blob_entries:
         assert edge_in(src, cd.tree_hexsha, blob_sha), (
             f"Expected tree→blob edge {cd.tree_hexsha[:8]} → {blob_sha[:8]}"
         )
+
+
+def test_verbose_all_filenames_shown_when_blobs_share_sha(repo: RepoTools):
+    """All filenames in a tree must appear as edges even when files share the same blob SHA.
+
+    Empty files all hash to e69de29bb.  When a commit adds two empty files, the tree
+    has two entries pointing to the same blob.  Both filenames must still appear as
+    labelled edges in the diagram -- one per tree entry, not one per unique blob SHA.
+    """
+    repo.write("aaa.py", content="")
+    repo.write("bbb.py", content="")
+    sha = repo.commit("two empty files sharing a blob")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    cd = graph.commits[sha]
+    td = graph.trees[cd.tree_hexsha]
+
+    # Data model must preserve (name, sha) pairs, not just unique SHAs
+    names_in_entries = {name for name, _ in td.blob_entries}
+    assert names_in_entries == {"aaa.py", "bbb.py"}, (
+        f"blob_entries must list both filenames; got {names_in_entries}"
+    )
+
+    # Both filenames must appear in the rendered diagram
+    assert "aaa.py" in src, "aaa.py must appear in diagram even when sharing blob SHA with bbb.py"
+    assert "bbb.py" in src, "bbb.py must appear in diagram even when sharing blob SHA with aaa.py"
+
+
+def test_verbose_tree_to_blob_edge_uses_blob_entries(repo: RepoTools):
+    """tree→blob edges must be keyed on (tree, filename), not (tree, blob_sha).
+
+    When a single tree has multiple entries pointing to the same blob SHA, the diagram
+    must draw one edge per filename rather than collapsing them into a single edge.
+    """
+    repo.write("x.py", content="same")
+    repo.write("y.py", content="same")
+    repo.commit("two files same content")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    # Both (tree, name) edges must exist in the DOT source
+    assert "x.py" in src, "x.py edge label must appear in verbose diagram"
+    assert "y.py" in src, "y.py edge label must appear in verbose diagram"
+
+
+def test_verbose_blob_node_label_is_hash_not_filename(repo: RepoTools):
+    """Blob nodes must be labelled with just their short hash, not a filename.
+
+    The filename belongs in the edge label (tree → blob), not the blob node itself.
+    Putting a filename in the blob node label is misleading when multiple files share
+    the same blob SHA -- the node would show whichever filename happened to be
+    processed first, making it look like a file when it's really content-addressed
+    object storage.
+    """
+    repo.write("readme.md", content="hello")
+    sha = repo.commit("add readme")
+
+    dg, _, graph, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+
+    cd = graph.commits[sha]
+    td = graph.trees[cd.tree_hexsha]
+    assert td.blob_entries
+    _name, blob_sha = td.blob_entries[0]
+
+    # The node for this blob must be in the graph
+    assert node_in(src, blob_sha), "blob node must exist in verbose diagram"
+
+    # Filename must appear exactly once -- as the edge label, not also in the blob node label
+    assert src.count("readme.md") == 1, (
+        "filename should appear once (on the edge label), not also embedded in the blob node label"
+    )
 
 
 def test_verbose_nested_tree(repo: RepoTools):
