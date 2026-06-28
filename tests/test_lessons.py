@@ -19,6 +19,23 @@ from gitplot.repo import GitRepo
 from .conftest import RepoTools, edge_in, node_in
 
 
+def _fork_sha_labels(src: str) -> list[str]:
+    """Extract the full SHA node IDs of fork commit nodes from a branch-mode DOT source.
+
+    Fork nodes have labels like label="fork\\n<short_sha>" where \\n is an actual
+    newline character in the graphviz Python output.
+
+    Graphviz quotes SHA node IDs when they start with a digit (e.g. "0abc...") but
+    leaves them unquoted when they start with a letter (e.g. f09d...).  The regex
+    handles both forms with an optional leading/trailing double-quote.
+    """
+    import re
+
+    # "? matches the optional leading quote; "? at the end matches optional trailing quote
+    # \n in the raw regex string is the regex metacharacter matching actual newline chr(10)
+    return re.findall(r'"?([0-9a-f]{40})"?\s*\[label="fork\n', src)
+
+
 def _build(repo_path: str, mode: str = "normal", **kwargs):
     """Build a gitplot graph from a real repo path; return (Digraph, GraphBuilder, RepoGraph)."""
     git_repo = GitRepo(repo_path)
@@ -1088,3 +1105,137 @@ class TestLesson08InteractiveRebase:
         # ORIG_HEAD keeps the old tip visible
         assert node_in(src, "ORIG_HEAD")
         assert edge_in(src, "ORIG_HEAD", old_sha)
+
+
+# ---------------------------------------------------------------------------
+# EP 12 — Comparing --no-ff Merge vs Rebase in Branch Mode
+# Lesson: branch mode highlights the structural difference between strategies:
+#         --no-ff preserves a fork point (branches visibly diverged then converged);
+#         rebase produces a linear parent-child chain with no fork node at all.
+# ---------------------------------------------------------------------------
+
+
+class TestLesson12MergeVsRebaseBranchMode:
+    def _diverged_repo(self, repo: RepoTools) -> tuple[str, str]:
+        """Build a repo where main and feature have each added one commit after branching."""
+        repo.write("base.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        feature_sha = repo.commit("feature work")
+        repo.checkout("main")
+        repo.write("main_extra.txt")
+        main_sha = repo.commit("main extra work")
+        return feature_sha, main_sha
+
+    def test_diverged_branches_show_fork_node_in_branch_mode(self, repo: RepoTools) -> None:
+        """Before any merge or rebase: two branches that have each advanced produce a fork
+        commit node in branch mode at their common ancestor.
+
+        Edge pattern: fork_sha -> main AND fork_sha -> feature (fork is parent of both,
+        in RL layout the fork sits to the right of both branch labels).
+        """
+        self._diverged_repo(repo)
+
+        dg, _, _ = _build(str(repo.path), mode="branch")
+        src = dg.source
+
+        assert node_in(src, "main")
+        assert node_in(src, "feature")
+        # Fork node label uses actual newline (graphviz Python lib renders \n as chr(10))
+        assert '"fork\n' in src, (
+            'Diverged branches must produce a fork commit node labelled "fork\\n<sha>"'
+        )
+        fork_shas = _fork_sha_labels(src)
+        assert fork_shas, "At least one fork SHA must be extractable"
+        fork_sha = fork_shas[0]
+        # Fork is parent of both branches: fork -> main AND fork -> feature
+        assert edge_in(src, fork_sha, "main"), "Fork must have an edge to main"
+        assert edge_in(src, fork_sha, "feature"), "Fork must have an edge to feature"
+
+    def test_no_ff_merge_retains_fork_node_in_branch_mode(self, repo: RepoTools) -> None:
+        """After --no-ff merge (feature branch kept): the fork node still appears.
+
+        --no-ff preserves the knowledge that the branches diverged at a real commit.
+        The topology is unchanged: fork -> main AND fork -> feature.  This is the
+        key EP12 contrast with rebase, which produces a linear chain instead.
+        """
+        self._diverged_repo(repo)
+        repo.merge("feature", no_ff=True)
+
+        dg, _, _ = _build(str(repo.path), mode="branch")
+        src = dg.source
+
+        assert node_in(src, "main")
+        assert node_in(src, "feature")
+        assert '"fork\n' in src, (
+            "After --no-ff merge (feature kept), fork node must still appear in branch mode"
+        )
+        fork_shas = _fork_sha_labels(src)
+        assert fork_shas, "Fork SHA must be extractable after --no-ff merge"
+        fork_sha = fork_shas[0]
+        assert edge_in(src, fork_sha, "main"), "Fork -> main edge must exist"
+        assert edge_in(src, fork_sha, "feature"), "Fork -> feature edge must exist"
+
+    def test_rebase_produces_linear_chain_in_branch_mode(self, repo: RepoTools) -> None:
+        """After rebase: feature's tip sits directly above main — the topology becomes
+        a linear chain rather than a symmetric fork.
+
+        The fork commit that appears IS main's tip (feature is now its direct child).
+        Edge pattern: main -> fork_sha -> feature (main points to the fork, fork points
+        to feature — the opposite of the pre-rebase pattern where fork pointed to main).
+        """
+        self._diverged_repo(repo)
+        repo.checkout("feature")
+        repo._run(["git", "rebase", "main"])
+        repo.checkout("main")
+
+        dg, _, _ = _build(str(repo.path), mode="branch")
+        src = dg.source
+
+        assert node_in(src, "main")
+        assert node_in(src, "feature")
+        # A fork commit still appears — it is now main's tip (not the old common base)
+        assert '"fork\n' in src, "A fork commit node must still appear after rebase"
+        fork_shas = _fork_sha_labels(src)
+        assert fork_shas, "Fork SHA must be extractable after rebase"
+        fork_sha = fork_shas[0]
+        # Linear chain: main -> fork -> feature  (not: fork -> main AND fork -> feature)
+        assert edge_in(src, "main", fork_sha), (
+            "After rebase, main must point TO the fork commit (main's tip IS the fork)"
+        )
+        assert edge_in(src, fork_sha, "feature"), (
+            "After rebase, the fork must point to feature (feature branches above main)"
+        )
+        # The pre-rebase symmetric pattern (fork -> main) must be gone
+        assert not edge_in(src, fork_sha, "main"), (
+            "After rebase, the fork must NOT point back to main — that was the pre-rebase pattern"
+        )
+
+    def test_fast_forward_merge_leaves_no_fork_in_branch_mode(self, repo: RepoTools) -> None:
+        """After a fast-forward merge: main advances to feature's tip; no fork ever formed.
+
+        Branch mode shows a direct main -> feature edge (main is the parent, feature is the
+        child because it was ahead of main and main caught up).  No fork commit node appears.
+        """
+        repo.write("base.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        repo.commit("feature work")
+        repo.checkout("main")
+        repo._run(["git", "merge", "feature"])  # fast-forward
+
+        dg, _, _ = _build(str(repo.path), mode="branch")
+        src = dg.source
+
+        # No fork — they were never diverged
+        assert '"fork\n' not in src, (
+            "Fast-forward merge never creates a fork commit — no fork node should appear"
+        )
+        assert node_in(src, "main")
+        assert node_in(src, "feature")
+        # After FF, the two branches are connected by a direct edge (no fork in between)
+        assert edge_in(src, "main", "feature") or edge_in(src, "feature", "main"), (
+            "After fast-forward merge, main and feature must be directly connected"
+        )
