@@ -68,6 +68,7 @@ class TreeData:
     parent_hexsha: str  # parent commit or tree hexsha
     child_tree_hexshas: list[str] = field(default_factory=list)
     blob_entries: list[tuple[str, str]] = field(default_factory=list)  # (name, hexsha)
+    gitlink_entries: list[tuple[str, str]] = field(default_factory=list)  # (name, commit_hexsha)
 
 
 @dataclass
@@ -680,6 +681,7 @@ class GitRepo:
             parent_hexsha=parent_hexsha,
             child_tree_hexshas=[t.hexsha for t in tree.trees],
             blob_entries=[(b.name, b.hexsha) for b in tree.blobs],
+            gitlink_entries=[(s.path, s.hexsha) for s in tree if s.mode == 0o160000],
         )
 
         for blob in tree.blobs:
