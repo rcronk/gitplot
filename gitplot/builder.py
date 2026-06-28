@@ -294,6 +294,8 @@ class GraphBuilder:
             label = node.name
             if node.is_head:
                 label = f"HEAD->{node.name}"
+            if node.worktree_path:
+                label = f"{label}\n[wt: {node.worktree_path}]"
             self._add_node(dg, node.name, label=label, type_key=type_key)
 
         # Fork commit nodes -- shown as commit-style nodes labelled with short hash
