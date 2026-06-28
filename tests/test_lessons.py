@@ -1257,8 +1257,8 @@ class TestLesson12MergeVsRebaseBranchMode:
 
 class TestLesson14RemoteFork:
     def _setup_remote(self, repo: RepoTools) -> None:
-        """Create a bare remote at a sibling directory, add as origin, push main."""
-        remote_path = repo.path.parent / "remote.git"
+        """Create a bare remote unique to this test's tmp dir, add as origin, push main."""
+        remote_path = repo.path.parent / (repo.path.name + "_remote.git")
         subprocess.check_call(
             ["git", "init", "--bare", str(remote_path)],
             stdout=subprocess.DEVNULL,
