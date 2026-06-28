@@ -1349,3 +1349,81 @@ class TestLesson14RemoteFork:
         assert node_in(src, "refs/heads/main"), (
             "Local refs/heads/main must still appear when remotes are excluded"
         )
+
+
+# EP 15 — git bisect and the Commit Graph
+# Lesson: during an active bisect session git writes .git/BISECT_HEAD pointing
+#         at the commit currently under test; gitplot surfaces it as a ref node
+#         so learners can see exactly where bisect has landed in the history.
+# ---------------------------------------------------------------------------
+
+
+class TestLesson15Bisect:
+    def _linear_repo(self, repo: RepoTools) -> tuple[str, str, str]:
+        """Three-commit linear history: sha1 (good) < sha2 (midpoint) < sha3 (bad)."""
+        repo.write("a.txt")
+        sha1 = repo.commit("first")
+        repo.write("b.txt")
+        sha2 = repo.commit("second")
+        repo.write("c.txt")
+        sha3 = repo.commit("third")
+        return sha1, sha2, sha3
+
+    def test_bisect_head_appears_during_bisect_session(self, repo: RepoTools) -> None:
+        """After git bisect start --no-checkout + marking good/bad, BISECT_HEAD appears."""
+        sha1, sha2, sha3 = self._linear_repo(repo)
+        repo._run(["git", "bisect", "start", "--no-checkout"])
+        repo._run(["git", "bisect", "bad", sha3])
+        repo._run(["git", "bisect", "good", sha1])
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert node_in(src, "BISECT_HEAD"), (
+            "BISECT_HEAD must appear as a ref node during an active bisect session"
+        )
+        assert edge_in(src, "BISECT_HEAD", sha2), (
+            "BISECT_HEAD must edge to the midpoint commit git bisect selected"
+        )
+
+    def test_bisect_head_absent_when_not_bisecting(self, repo: RepoTools) -> None:
+        """Without an active bisect session, no BISECT_HEAD node appears."""
+        self._linear_repo(repo)
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert not node_in(src, "BISECT_HEAD"), (
+            "BISECT_HEAD must not appear when no bisect session is in progress"
+        )
+
+    def test_bisect_head_malformed_does_not_crash(self, repo: RepoTools) -> None:
+        """A garbage .git/BISECT_HEAD file is silently ignored; no phantom node."""
+        self._linear_repo(repo)
+        (repo.path / ".git" / "BISECT_HEAD").write_text("not-a-valid-sha\n", encoding="utf-8")
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert not node_in(src, "BISECT_HEAD"), (
+            "A malformed BISECT_HEAD file must be silently ignored -- no phantom node"
+        )
+
+    def test_bisect_good_bad_marks_visible_alongside_bisect_head(self, repo: RepoTools) -> None:
+        """In --no-checkout mode HEAD stays on main while BISECT_HEAD marks the midpoint."""
+        sha1, sha2, sha3 = self._linear_repo(repo)
+        repo._run(["git", "bisect", "start", "--no-checkout"])
+        repo._run(["git", "bisect", "bad", sha3])
+        repo._run(["git", "bisect", "good", sha1])
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert node_in(src, "BISECT_HEAD"), "BISECT_HEAD must appear"
+        assert node_in(src, "refs/heads/main"), "main branch ref must still appear"
+        assert edge_in(src, "refs/heads/main", sha3), (
+            "main must still point at sha3 -- HEAD did not move in --no-checkout mode"
+        )
+        assert edge_in(src, "BISECT_HEAD", sha2), (
+            "BISECT_HEAD must point at the midpoint between good sha1 and bad sha3"
+        )

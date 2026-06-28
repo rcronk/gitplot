@@ -504,8 +504,8 @@ class GitRepo:
                 )
             )
 
-        # ORIG_HEAD / MERGE_HEAD / CHERRY_PICK_HEAD — written during resets, merges, cherry-picks
-        for special_name in ("ORIG_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD"):
+        # ORIG_HEAD / MERGE_HEAD / CHERRY_PICK_HEAD / BISECT_HEAD
+        for special_name in ("ORIG_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD", "BISECT_HEAD"):
             sp_sha = self._read_simple_ref(special_name)
             if sp_sha and special_name not in seen:
                 seen.add(special_name)
