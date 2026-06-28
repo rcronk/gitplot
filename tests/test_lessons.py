@@ -1534,3 +1534,157 @@ class TestLesson16Submodules:
         gitlink_node_id = f"gitlink|{sub_commit_sha}"
         assert node_in(src, gitlink_node_id), "Gitlink node must appear"
         assert '"blob\n' in src, "Regular blob nodes must still appear alongside the gitlink node"
+
+
+# EP 16 (curriculum) — Force Push Is Destroying Someone's History: Here's the Proof
+# Lesson: gitplot makes the danger concrete by showing local main and origin/main
+#         pointing to different commits (diverged state). After a force push,
+#         origin/main resets to the local commit; the displaced commit is orphaned.
+# ---------------------------------------------------------------------------
+
+
+class TestEP16ForcePush:
+    def _setup_diverged(self, repo: RepoTools):
+        """Build the diverged state and return (sha_local, sha_teammate, clone_path).
+
+        1. Create a bare remote unique to this test's tmp dir.
+        2. Push sha_base from the main repo.
+        3. Clone to clone_path; teammate adds a commit and pushes (sha_teammate).
+        4. Main repo fetches: origin/main -> sha_teammate.
+        5. Main repo adds a local commit: main -> sha_local, origin/main -> sha_teammate.
+        """
+        remote_path = repo.path.parent / (repo.path.name + "_remote.git")
+        clone_path = repo.path.parent / (repo.path.name + "_clone")
+        subprocess.check_call(
+            ["git", "init", "--bare", "-b", "main", str(remote_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        repo.write("base.txt")
+        repo.commit("base")
+        repo._run(["git", "remote", "add", "origin", str(remote_path)])
+        repo._run(["git", "push", "-u", "origin", "main"])
+
+        subprocess.check_call(
+            ["git", "clone", "--branch", "main", str(remote_path), str(clone_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        subprocess.check_call(
+            ["git", "config", "user.email", "tm@test"], cwd=clone_path, stderr=subprocess.DEVNULL
+        )
+        subprocess.check_call(
+            ["git", "config", "user.name", "Teammate"], cwd=clone_path, stderr=subprocess.DEVNULL
+        )
+        (clone_path / "teammate.txt").write_text("teammate work", encoding="utf-8")
+        subprocess.check_call(["git", "add", "-A"], cwd=clone_path, stderr=subprocess.DEVNULL)
+        subprocess.check_call(
+            ["git", "commit", "-m", "teammate commit"], cwd=clone_path, stderr=subprocess.DEVNULL
+        )
+        subprocess.check_call(
+            ["git", "push", "origin", "main"],
+            cwd=clone_path,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        sha_teammate = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=clone_path, stderr=subprocess.DEVNULL
+            )
+            .decode()
+            .strip()
+        )
+
+        repo._run(["git", "fetch", "origin"])
+        repo.write("local.txt")
+        sha_local = repo.commit("local-only commit")
+
+        return sha_local, sha_teammate, clone_path
+
+    def test_diverged_state_shows_both_refs(self, repo: RepoTools) -> None:
+        """Before force push: local main and origin/main point to different commits."""
+        sha_local, sha_teammate, _ = self._setup_diverged(repo)
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert edge_in(src, "refs/heads/main", sha_local), (
+            "refs/heads/main must point to the local commit"
+        )
+        assert node_in(src, "refs/remotes/origin/main"), (
+            "refs/remotes/origin/main must appear -- diverged state is visible in gitplot"
+        )
+        assert edge_in(src, "refs/remotes/origin/main", sha_teammate), (
+            "refs/remotes/origin/main must point to the teammate's commit, not the local one"
+        )
+
+    def test_force_push_resets_origin_main(self, repo: RepoTools) -> None:
+        """After force push, origin/main moves to the local commit; teammate's commit orphaned."""
+        sha_local, sha_teammate, _ = self._setup_diverged(repo)
+        repo._run(["git", "push", "--force", "origin", "main"])
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert edge_in(src, "refs/heads/main", sha_local), (
+            "refs/heads/main must still point to sha_local after force push"
+        )
+        assert edge_in(src, "refs/remotes/origin/main", sha_local), (
+            "After force push, refs/remotes/origin/main must point to sha_local"
+        )
+        assert not edge_in(src, "refs/remotes/origin/main", sha_teammate), (
+            "origin/main must no longer point to the teammate's commit after force push"
+        )
+
+    def test_force_with_lease_rejected_leaves_graph_unchanged(self, repo: RepoTools) -> None:
+        """Rejected --force-with-lease leaves origin/main pointing at the last-fetched SHA."""
+        sha_local, sha_teammate, clone_path = self._setup_diverged(repo)
+
+        # Teammate pushes again AFTER our last fetch -- remote has moved past sha_teammate.
+        (clone_path / "more.txt").write_text("more work", encoding="utf-8")
+        subprocess.check_call(["git", "add", "-A"], cwd=clone_path, stderr=subprocess.DEVNULL)
+        subprocess.check_call(
+            ["git", "commit", "-m", "another teammate commit"],
+            cwd=clone_path,
+            stderr=subprocess.DEVNULL,
+        )
+        subprocess.check_call(
+            ["git", "push", "origin", "main"],
+            cwd=clone_path,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        result = subprocess.run(
+            ["git", "push", "--force-with-lease", "origin", "main"],
+            cwd=str(repo.path),
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0, (
+            "force-with-lease must fail when remote has moved past the last-fetched ref"
+        )
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert edge_in(src, "refs/remotes/origin/main", sha_teammate), (
+            "After rejected force-with-lease, origin/main must still point to the last-fetched SHA"
+        )
+        assert edge_in(src, "refs/heads/main", sha_local), (
+            "Local main must be unchanged after a rejected force-with-lease push"
+        )
+
+    def test_exclude_remotes_hides_origin_main_when_diverged(self, repo: RepoTools) -> None:
+        """With exclude_remotes=True, origin/main is hidden even in the diverged state."""
+        self._setup_diverged(repo)
+
+        dg, _, _ = _build(str(repo.path), exclude_remotes=True)
+        src = dg.source
+
+        assert "refs/remotes" not in src, (
+            "With exclude_remotes=True, no refs/remotes/* nodes should appear"
+        )
+        assert node_in(src, "refs/heads/main"), (
+            "Local refs/heads/main must still appear when remotes are excluded"
+        )
