@@ -64,24 +64,36 @@ class TestLesson02FirstRepo:
         assert edge_in(src, "refs/heads/main", sha2)
 
     def test_boring_chain_collapsed_into_summary_node(self, repo: RepoTools) -> None:
-        """Five commits with no refs in between collapse into a single summary node."""
+        """Boring middle commits collapse into a summary node in normal mode.
+
+        With 5 commits total: commit 1 (initial, 0 parents) and commit 5 (tip, has ref) are
+        not boring.  Commits 2-4 are boring (1 parent, 1 child, 0 refs) and collapse into one
+        summary node labelled "sha (3) sha".
+        """
+        import re
+
         repo.write("base.txt")
         repo.commit("first")
-        # Add four more unremarkable commits — they form a boring run
+        # Add four more unremarkable commits — commits 2-4 form a boring run
         for i in range(4):
             repo.write(f"file{i}.txt")
             sha_last = repo.commit(f"commit {i + 2}")
         dg, _, _ = _build(str(repo.path))
         src = dg.source
-        # The boring run should be collapsed: not every SHA appears as its own node
-        # but a summary node label like "sha (N) sha" should be present
+        # The tip and the branch ref are always visible
         assert node_in(src, "refs/heads/main")
         assert node_in(src, sha_last)
-        # The very first SHA may be absorbed into a summary node
-        # What we care about: there are fewer than 5 separate commit nodes
-        commit_node_count = src.count('"commit\\n')
-        assert commit_node_count < 5, (
-            "Five boring commits should collapse — expected fewer than 5 commit nodes"
+        # Boring commits 2-4 collapse into one summary node; label format is "sha (N) sha"
+        # Presence of "(3)" (or any "(N)") confirms the collapse happened
+        assert re.search(r"\(\d+\)", src), (
+            "Boring-run summary node must have a label like 'sha (N) sha'"
+        )
+        # Only 2 full 'commit\n...' nodes should exist (first + tip);
+        # the 3 boring commits in between produce a summary node, not 3 commit nodes
+        commit_node_defs = src.count('"commit\\n')
+        assert commit_node_defs <= 2, (
+            f"Expected at most 2 full commit nodes (first + tip); found {commit_node_defs}. "
+            "Boring-run collapse may be broken."
         )
 
 
@@ -233,31 +245,48 @@ class TestLesson05Reset:
         return sha1, sha2
 
     def test_reset_soft_moves_branch_pointer_back(self, repo: RepoTools) -> None:
-        """After reset --soft HEAD~1: main points to the first commit; second is gone."""
+        """After reset --soft HEAD~1: main points to the first commit.
+
+        git reset --soft writes ORIG_HEAD pointing at sha2 (the pre-reset tip), so sha2
+        stays visible in the graph via ORIG_HEAD even though main no longer points to it.
+        """
         sha1, sha2 = self._two_commits(repo)
         repo._run(["git", "reset", "--soft", "HEAD~1"])
         dg, _, _ = _build(str(repo.path))
         src = dg.source
         assert edge_in(src, "refs/heads/main", sha1)
         assert not edge_in(src, "refs/heads/main", sha2)
+        # All git reset modes write ORIG_HEAD -- feat #24 makes it visible in the graph
+        assert node_in(src, "ORIG_HEAD"), "ORIG_HEAD must appear after git reset --soft"
+        assert edge_in(src, "ORIG_HEAD", sha2), "ORIG_HEAD must point at the pre-reset commit"
 
     def test_reset_mixed_moves_branch_pointer_back(self, repo: RepoTools) -> None:
-        """After reset --mixed HEAD~1: same pointer movement as --soft."""
+        """After reset --mixed HEAD~1: same pointer movement as --soft.
+
+        git reset --mixed also writes ORIG_HEAD, keeping sha2 reachable.
+        """
         sha1, sha2 = self._two_commits(repo)
         repo._run(["git", "reset", "--mixed", "HEAD~1"])
         dg, _, _ = _build(str(repo.path))
         src = dg.source
         assert edge_in(src, "refs/heads/main", sha1)
         assert not edge_in(src, "refs/heads/main", sha2)
+        assert node_in(src, "ORIG_HEAD"), "ORIG_HEAD must appear after git reset --mixed"
+        assert edge_in(src, "ORIG_HEAD", sha2), "ORIG_HEAD must point at the pre-reset commit"
 
     def test_reset_hard_moves_branch_pointer_back(self, repo: RepoTools) -> None:
-        """After reset --hard HEAD~1: same pointer movement; working tree also wiped."""
+        """After reset --hard HEAD~1: same pointer movement; working tree also wiped.
+
+        git reset --hard writes ORIG_HEAD, keeping sha2 visible as a safety net.
+        """
         sha1, sha2 = self._two_commits(repo)
         repo._run(["git", "reset", "--hard", "HEAD~1"])
         dg, _, _ = _build(str(repo.path))
         src = dg.source
         assert edge_in(src, "refs/heads/main", sha1)
         assert not edge_in(src, "refs/heads/main", sha2)
+        assert node_in(src, "ORIG_HEAD"), "ORIG_HEAD must appear after git reset --hard"
+        assert edge_in(src, "ORIG_HEAD", sha2), "ORIG_HEAD must point at the pre-reset commit"
 
 
 # ---------------------------------------------------------------------------
@@ -347,17 +376,31 @@ class TestLesson07RebaseVsMerge:
 
 class TestLesson09Stash:
     def test_stash_appears_as_ref_in_verbose_mode(self, repo: RepoTools) -> None:
-        """git stash creates refs/stash entries, visible in verbose mode only."""
+        """git stash creates a ref node in verbose mode with an edge to the stash commit.
+
+        The stash ref's path is 'stash/stash@{0}' (from _collect_refs with include_stash=True).
+        We look it up from graph.refs rather than hardcoding the path format.
+        """
         repo.write("a.txt", "original")
         repo.commit("base")
         repo.write("a.txt", "modified — not committed")
         repo._run(["git", "add", "-A"])
         repo._run(["git", "stash"])
-        dg, _, _ = _build(str(repo.path), mode="verbose")
+        dg, _, graph = _build(str(repo.path), mode="verbose")
         src = dg.source
-        assert "stash" in src.lower(), (
-            "Stash ref should appear in verbose mode graph. "
-            "In normal mode stash is hidden (include_stash=False)."
+        # Find the stash ref in graph.refs (path contains "stash")
+        stash_ref = next((r for r in graph.refs if "stash" in r.path), None)
+        assert stash_ref is not None, (
+            "A stash ref must appear in graph.refs in verbose mode — "
+            "GitRepo._collect_refs collects stash entries when include_stash=True"
+        )
+        # Structural check: the stash ref node must be present in DOT
+        assert node_in(src, stash_ref.path), (
+            f"Stash ref node '{stash_ref.path}' must appear in DOT source in verbose mode"
+        )
+        # And it must edge to the stash commit SHA
+        assert edge_in(src, stash_ref.path, stash_ref.commit_hexsha), (
+            f"Stash ref '{stash_ref.path}' must have an edge to the stash commit"
         )
 
     def test_stash_not_visible_in_normal_mode(self, repo: RepoTools) -> None:
@@ -367,10 +410,13 @@ class TestLesson09Stash:
         repo.write("a.txt", "modified — not committed")
         repo._run(["git", "add", "-A"])
         repo._run(["git", "stash"])
-        dg, _, _ = _build(str(repo.path), mode="normal")
+        dg, _, graph = _build(str(repo.path), mode="normal")
         src = dg.source
-        # stash ref nodes should not appear in normal mode
-        assert "stash@" not in src
+        # No stash ref in graph.refs in normal mode (include_stash=False)
+        stash_ref = next((r for r in graph.refs if "stash" in r.path), None)
+        assert stash_ref is None, "Stash ref must not be collected by GitRepo in normal mode"
+        # And "stash" must not appear as a node in the DOT graph
+        assert "stash" not in src.lower(), "Stash must be absent from normal mode DOT output"
 
 
 # ---------------------------------------------------------------------------
@@ -538,33 +584,60 @@ class TestLesson13Tags:
         assert edge_in(src, "refs/tags/v1.0", sha)
 
     def test_annotated_tag_creates_intermediate_tag_object(self, repo: RepoTools) -> None:
-        """Annotated tag: ref → tag object → commit (two-hop chain, not one)."""
+        """Annotated tag: ref → tag object → commit (two-hop chain, not one).
+
+        The tag object node has its own SHA distinct from the commit SHA.
+        We verify the full chain: refs/tags/v2.0 → tag_obj_sha → commit_sha.
+        """
         repo.write("a.txt")
         sha = repo.commit("release prep")
         repo.tag("v2.0", annotated=True, message="Release 2.0")
-        dg, _, _ = _build(str(repo.path))
+        dg, _, graph = _build(str(repo.path))
         src = dg.source
-        assert node_in(src, "refs/tags/v2.0")
-        # The annotated tag ref does NOT edge directly to the commit — it goes via a tag object
-        assert not edge_in(src, "refs/tags/v2.0", sha), (
-            "Annotated tag ref should point to a tag object, not directly to the commit"
+        # Find the annotated tag ref in the graph to get the tag object SHA
+        tag_ref = next((r for r in graph.refs if r.path == "refs/tags/v2.0"), None)
+        assert tag_ref is not None, "refs/tags/v2.0 must appear in graph.refs"
+        tag_obj_sha = tag_ref.tag_object_hexsha
+        assert tag_obj_sha is not None, "Annotated tag must have a tag_object_hexsha"
+        assert tag_obj_sha != sha, "Tag object SHA must differ from commit SHA"
+        # Full two-hop chain must be present in the DOT source
+        assert node_in(src, "refs/tags/v2.0"), "Tag ref node must exist"
+        assert node_in(src, tag_obj_sha), "Tag object node must exist"
+        assert node_in(src, sha), "Commit node must exist"
+        assert edge_in(src, "refs/tags/v2.0", tag_obj_sha), (
+            "Annotated tag ref must edge to the tag object, not the commit"
         )
-        # A tag object node is present (label contains "tag")
-        assert "tag" in src
+        assert edge_in(src, tag_obj_sha, sha), "Tag object must edge to the commit"
+        # The ref must NOT skip the tag object and point directly to the commit
+        assert not edge_in(src, "refs/tags/v2.0", sha), (
+            "Annotated tag ref must not point directly to the commit — it goes via a tag object"
+        )
 
     def test_lightweight_and_annotated_tags_coexist(self, repo: RepoTools) -> None:
-        """Both tag types appear simultaneously, with different graph shapes."""
+        """Both tag types appear simultaneously, with different graph shapes.
+
+        v1.0 (lightweight): refs/tags/v1.0 → commit (one hop)
+        v2.0 (annotated):   refs/tags/v2.0 → tag_object → commit (two hops)
+        """
         repo.write("a.txt")
         sha = repo.commit("release prep")
         repo.tag("v1.0", annotated=False)
         repo.tag("v2.0", annotated=True, message="v2.0")
-        dg, _, _ = _build(str(repo.path))
+        dg, _, graph = _build(str(repo.path))
         src = dg.source
         assert node_in(src, "refs/tags/v1.0")
         assert node_in(src, "refs/tags/v2.0")
-        # v1.0 points directly to the commit
+        # v1.0 points directly to the commit (one hop)
         assert edge_in(src, "refs/tags/v1.0", sha)
-        # v2.0 does not (it goes via a tag object)
+        # v2.0 goes via a tag object — find and verify the two-hop chain
+        tag_ref = next((r for r in graph.refs if r.path == "refs/tags/v2.0"), None)
+        assert tag_ref is not None
+        tag_obj_sha = tag_ref.tag_object_hexsha
+        assert tag_obj_sha is not None, "v2.0 must have a tag object SHA"
+        assert node_in(src, tag_obj_sha), "Tag object node must be in the graph"
+        assert edge_in(src, "refs/tags/v2.0", tag_obj_sha), "v2.0 ref → tag object"
+        assert edge_in(src, tag_obj_sha, sha), "tag object → commit"
+        # v2.0 must not point directly to the commit
         assert not edge_in(src, "refs/tags/v2.0", sha)
 
 
