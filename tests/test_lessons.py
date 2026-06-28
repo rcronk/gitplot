@@ -1688,3 +1688,104 @@ class TestEP16ForcePush:
         assert node_in(src, "refs/heads/main"), (
             "Local refs/heads/main must still appear when remotes are excluded"
         )
+
+
+# EP 20 (curriculum) — All the Way Down: git cat-file, .git/objects, and Pack Files
+# Lesson: gitplot's verbose graph SHA labels correspond directly to what git cat-file
+#         reports for each object. After git gc packs loose objects, GitPython reads
+#         the pack transparently and gitplot continues to show the full object graph.
+# ---------------------------------------------------------------------------
+
+
+class TestLesson20PackFiles:
+    def test_blob_sha_matches_object_store(self, repo: RepoTools) -> None:
+        """The blob SHA in verbose mode matches what git cat-file -t reports as 'blob'."""
+        repo.write("hello.txt", content="hello world\n")
+        repo.commit("initial")
+        blob_sha = repo._run(["git", "rev-parse", "HEAD:hello.txt"])
+
+        obj_type = subprocess.check_output(
+            ["git", "cat-file", "-t", blob_sha],
+            cwd=str(repo.path),
+            text=True,
+        ).strip()
+        assert obj_type == "blob"
+
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+
+        assert node_in(src, blob_sha), (
+            "The blob SHA reported by git cat-file must appear as a node in the verbose graph"
+        )
+
+    def test_tree_sha_matches_object_store(self, repo: RepoTools) -> None:
+        """The root tree SHA in verbose mode matches git rev-parse HEAD^{tree}."""
+        repo.write("a.txt")
+        repo.commit("initial")
+        tree_sha = repo._run(["git", "rev-parse", "HEAD^{tree}"])
+
+        obj_type = subprocess.check_output(
+            ["git", "cat-file", "-t", tree_sha],
+            cwd=str(repo.path),
+            text=True,
+        ).strip()
+        assert obj_type == "tree"
+
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+
+        assert node_in(src, tree_sha), (
+            "The root tree SHA from git rev-parse HEAD^{tree} must appear in the verbose graph"
+        )
+
+    def test_verbose_mode_after_git_gc(self, repo: RepoTools) -> None:
+        """After git gc packs loose objects, verbose mode still shows the full object graph."""
+        repo.write("a.txt")
+        sha1 = repo.commit("first")
+        repo.write("b.txt")
+        sha2 = repo.commit("second")
+
+        repo._run(["git", "gc", "--quiet"])
+
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+
+        assert node_in(src, sha2), (
+            "Most recent commit node must still appear in verbose mode after git gc"
+        )
+        assert node_in(src, sha1), (
+            "Earlier commit node must still appear after git gc packs the object store"
+        )
+        assert '"blob\n' in src, "Blob nodes must still appear in verbose mode after gc"
+
+    def test_shared_blob_appears_once_after_git_gc(self, repo: RepoTools) -> None:
+        """An unchanged file is one blob across two commits; git gc preserves deduplication."""
+        repo.write("unchanged.txt", content="same content\n")
+        repo.write("changing.txt", content="version 1\n")
+        repo.commit("first")
+
+        repo.write("changing.txt", content="version 2\n")
+        repo.commit("second")
+
+        blob_sha_before = repo._run(["git", "rev-parse", "HEAD~1:unchanged.txt"])
+        blob_sha_after = repo._run(["git", "rev-parse", "HEAD:unchanged.txt"])
+        assert blob_sha_before == blob_sha_after, (
+            "unchanged.txt must have the same blob SHA in both commits"
+        )
+        tree_sha_1 = repo._run(["git", "rev-parse", "HEAD~1^{tree}"])
+        tree_sha_2 = repo._run(["git", "rev-parse", "HEAD^{tree}"])
+
+        repo._run(["git", "gc", "--quiet"])
+
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+
+        assert node_in(src, blob_sha_before), (
+            "The shared blob must appear as a node in the verbose graph after gc"
+        )
+        assert edge_in(src, tree_sha_1, blob_sha_before), (
+            "First commit's tree must have an edge to the shared blob after gc"
+        )
+        assert edge_in(src, tree_sha_2, blob_sha_before), (
+            "Second commit's tree must also edge to the same shared blob node after gc"
+        )
