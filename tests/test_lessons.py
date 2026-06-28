@@ -171,6 +171,35 @@ class TestLesson04Merging:
         assert edge_in(src, merge_sha, hotfix_sha)
         assert edge_in(src, merge_sha, feature_sha)
 
+    def test_conflicting_merge_shows_merge_head_in_graph(self, repo: RepoTools) -> None:
+        """Fix #24: an in-progress merge conflict writes MERGE_HEAD into the graph.
+
+        When 'git merge' stops with a conflict, git writes .git/MERGE_HEAD pointing
+        at the commit being merged in.  gitplot now surfaces this as a visible ref node.
+        """
+        import subprocess
+
+        repo.write("file.txt", "base")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("file.txt", "feature version")
+        feature_sha = repo.commit("feature change")
+        repo.checkout("main")
+        repo.write("file.txt", "main version")
+        repo.commit("main change")
+        try:
+            repo._run(["git", "merge", "feature"])
+        except subprocess.CalledProcessError:
+            pass  # conflict expected
+        assert (repo.path / ".git" / "MERGE_HEAD").exists()
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+        assert node_in(src, "MERGE_HEAD"), "MERGE_HEAD node must appear during merge conflict"
+        assert edge_in(src, "MERGE_HEAD", feature_sha), "MERGE_HEAD must point at the merged commit"
+        # DOT label accuracy: the node label should be the bare string "MERGE_HEAD"
+        assert "MERGE_HEAD" in src
+
     def test_no_ff_merge_in_branch_mode_shows_fork(self, repo: RepoTools) -> None:
         """Branch mode: diverged branches connect through a fork node."""
         repo.write("base.txt")
@@ -372,6 +401,35 @@ class TestLesson10CherryPick:
         assert node_in(src, picked_sha)
         assert edge_in(src, picked_sha, main_sha)
 
+    def test_cherry_pick_conflict_shows_cherry_pick_head_in_graph(self, repo: RepoTools) -> None:
+        """Fix #24: an in-progress cherry-pick conflict writes CHERRY_PICK_HEAD into the graph.
+
+        When 'git cherry-pick' stops with a conflict, git writes .git/CHERRY_PICK_HEAD
+        pointing at the commit being applied.  gitplot now surfaces this as a visible ref.
+        """
+        import subprocess
+
+        repo.write("file.txt", "v1")
+        repo.commit("initial")
+        repo.checkout("feature", new=True)
+        repo.write("file.txt", "feature version")
+        feature_sha = repo.commit("feature change")
+        repo.checkout("main")
+        repo.write("file.txt", "main version")
+        repo.commit("main diverges")
+        try:
+            repo._run(["git", "cherry-pick", feature_sha])
+        except subprocess.CalledProcessError:
+            pass  # conflict expected
+        assert (repo.path / ".git" / "CHERRY_PICK_HEAD").exists()
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+        assert node_in(src, "CHERRY_PICK_HEAD"), "CHERRY_PICK_HEAD must appear during conflict"
+        assert edge_in(src, "CHERRY_PICK_HEAD", feature_sha)
+        # DOT label accuracy: verify the label text is present in source
+        assert "CHERRY_PICK_HEAD" in src
+
     def test_cherry_picked_and_original_commit_both_in_graph(self, repo: RepoTools) -> None:
         """Both the original commit and the cherry-picked copy coexist in the graph.
 
@@ -414,7 +472,12 @@ class TestLesson11Reflog:
     def test_reset_hard_leaves_orig_head_pointing_at_pre_reset_commit(
         self, repo: RepoTools
     ) -> None:
-        """After reset --hard: ORIG_HEAD keeps the pre-reset commit reachable in the graph."""
+        """After reset --hard: ORIG_HEAD keeps the pre-reset commit reachable in the graph.
+
+        Fix #24: git reset --hard writes .git/ORIG_HEAD pointing at the commit that was
+        HEAD before the reset.  gitplot now reads this file and adds ORIG_HEAD as a ref node,
+        so learners can see the safety net git leaves behind.
+        """
         repo.write("a.txt")
         sha1 = repo.commit("first")
         repo.write("b.txt")
@@ -426,6 +489,8 @@ class TestLesson11Reflog:
         # git reset --hard writes ORIG_HEAD, so sha2 stays visible via that ref
         assert node_in(src, "ORIG_HEAD")
         assert edge_in(src, "ORIG_HEAD", sha2)
+        # DOT label accuracy: node label is the bare name "ORIG_HEAD"
+        assert "ORIG_HEAD" in src
 
     def test_lost_commit_reappears_when_head_detached_at_it(self, repo: RepoTools) -> None:
         """Detaching HEAD at the 'lost' SHA makes it visible again — the object still exists."""
@@ -662,12 +727,7 @@ class TestLesson19IndexExposed:
         assert "mystery.txt" in src
 
     def test_committed_file_clears_staged_changes(self, repo: RepoTools) -> None:
-        """After git commit: Staged Changes box disappears; file appears under tree.
-
-        Note: verbose mode requires at least one commit to exist before it can render
-        the index state — an empty repo (no commits) returns 'No git repo found'.
-        The lesson covers staging in a repo that already has commits.
-        """
+        """After git commit: Staged Changes box disappears; file appears under tree."""
         # Establish a base commit so verbose mode can render the index state
         repo.write("base.txt")
         repo.commit("base commit")
@@ -700,3 +760,133 @@ class TestLesson19IndexExposed:
         assert node_in(src, "Staged Changes")
         assert node_in(src, "Unstaged Changes")
         assert node_in(src, "Untracked")
+
+    # DOT accuracy: file nodes use "staged|path", "unstaged|path", "untracked|path" IDs
+    def test_staged_file_node_id_and_edge_are_correct(self, repo: RepoTools) -> None:
+        """The staged file gets node ID 'staged|<path>' with an edge from 'Staged Changes'."""
+        repo.write("a.txt")
+        repo.commit("base")
+        repo.write("new.txt", "content")
+        repo._run(["git", "add", "new.txt"])
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+        assert node_in(src, "staged|new.txt")
+        assert edge_in(src, "Staged Changes", "staged|new.txt")
+
+    def test_untracked_file_node_id_and_edge_are_correct(self, repo: RepoTools) -> None:
+        """Untracked file gets node ID 'untracked|<path>' with an edge from 'Untracked'."""
+        repo.write("a.txt")
+        repo.commit("base")
+        repo.write("ghost.txt", "not tracked")
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+        assert node_in(src, "untracked|ghost.txt")
+        assert edge_in(src, "Untracked", "untracked|ghost.txt")
+
+    def test_staged_file_visible_before_first_commit(self, repo: RepoTools) -> None:
+        """Fix #23: staged file appears in verbose mode even before the first commit (unborn HEAD).
+
+        Prior to the fix, the empty-repo guard in builder.py returned a 'no-repo' node
+        before _build_index() could run.  Now it checks for index state first.
+        """
+        repo.write("README.md", "# Hello")
+        repo._run(["git", "add", "README.md"])
+        # No commit yet — unborn HEAD
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+        assert node_in(src, "Staged Changes"), "Staged Changes box must appear before first commit"
+        assert node_in(src, "staged|README.md"), "Specific file node must appear"
+        assert edge_in(src, "Staged Changes", "staged|README.md")
+        assert "no-repo" not in src
+        assert "No git repo found" not in src
+
+
+# ---------------------------------------------------------------------------
+# Worktrees in branch mode (feat #25)
+# Lesson: git worktree lets you check out a second branch into a separate
+#         directory — branch mode annotates those branches with the path.
+# ---------------------------------------------------------------------------
+
+
+class TestWorktrees:
+    def test_branch_without_linked_worktree_has_no_annotation(self, repo: RepoTools) -> None:
+        """A branch not checked out in any worktree shows a plain label in branch mode."""
+        repo.write("a.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("b.txt")
+        repo.commit("feature work")
+        repo.checkout("main")
+
+        dg, _, _ = _build(str(repo.path), mode="branch")
+        src = dg.source
+        assert node_in(src, "feature")
+        assert "[wt:" not in src
+
+    def test_linked_worktree_branch_label_contains_wt_path(self, repo: RepoTools) -> None:
+        """A branch checked out in a linked worktree gets '[wt: <path>]' in its label.
+
+        Feat #25: gitplot reads 'git worktree list --porcelain', skips the main worktree,
+        and annotates each linked branch node with the worktree directory path.
+        """
+        repo.write("a.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("b.txt")
+        repo.commit("feature work")
+        repo.checkout("main")
+
+        wt_path = repo.path.parent / (repo.path.name + "-wt")
+        repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+        dg, _, _ = _build(str(repo.path), mode="branch")
+        src = dg.source
+        assert node_in(src, "feature")
+        # DOT label accuracy: the worktree path and annotation marker must both appear
+        # git porcelain always outputs forward-slash paths (even on Windows)
+        assert wt_path.as_posix() in src, "Worktree path must appear in DOT source"
+        assert "[wt:" in src, "'[wt:' annotation marker must appear in DOT source"
+
+    def test_linked_worktree_annotation_is_in_node_label_not_separate_node(
+        self, repo: RepoTools
+    ) -> None:
+        """The worktree path is part of the branch node label, not a new node."""
+        repo.write("a.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("b.txt")
+        repo.commit("feature work")
+        repo.checkout("main")
+
+        wt_path = repo.path.parent / (repo.path.name + "-wt")
+        repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+        dg, _, _ = _build(str(repo.path), mode="branch")
+        src = dg.source
+        # The path must appear inside a node label (surrounded by label=" ... ")
+        # rather than as a standalone token that would indicate a new node.
+        # git porcelain always uses forward slashes (even on Windows)
+        wt_str = wt_path.as_posix()
+        assert wt_str in src
+        # Confirm the branch node itself still exists with the right ID
+        assert node_in(src, "feature")
+        # Confirm no second node was created for the path alone
+        assert f"\t{wt_str} [" not in src and f'\t"{wt_str}" [' not in src
+
+    def test_main_worktree_branch_has_no_wt_annotation(self, repo: RepoTools) -> None:
+        """The branch checked out in the main worktree is not annotated — only linked ones are."""
+        repo.write("a.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("b.txt")
+        repo.commit("feature work")
+        repo.checkout("main")
+
+        wt_path = repo.path.parent / (repo.path.name + "-wt")
+        repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+        dg, _, _ = _build(str(repo.path), mode="branch")
+        src = dg.source
+        # 'main' is in the main worktree — its label should be "HEAD->main", no [wt:...]
+        assert "HEAD->main" in src
+        assert "HEAD->main\n[wt:" not in src
