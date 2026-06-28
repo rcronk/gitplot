@@ -1143,6 +1143,98 @@ def test_cherry_pick_head_absent_no_phantom_node(repo: RepoTools):
 
 
 # ---------------------------------------------------------------------------
+# Worktree annotation in branch mode (issue #25)
+# ---------------------------------------------------------------------------
+
+
+def test_worktree_no_annotation_when_no_linked_worktrees(repo: RepoTools):
+    """With only the main worktree, no worktree annotation appears in branch mode."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert "[wt:" not in dg.source
+
+
+def test_worktree_linked_branch_label_contains_path(repo: RepoTools):
+    """A branch checked out in a linked worktree has its path annotated on the branch node."""
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature commit")
+    repo.checkout("main")
+
+    wt_path = repo.path.parent / (repo.path.name + "-wt")
+    repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert str(wt_path) in dg.source
+
+
+def test_worktree_annotation_on_node_not_separate_node(repo: RepoTools):
+    """Worktree path appears as part of the branch label, not as a separate node."""
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature commit")
+    repo.checkout("main")
+
+    wt_path = repo.path.parent / (repo.path.name + "-wt")
+    repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    assert str(wt_path) in src
+    assert node_in(src, "feature")
+
+
+def test_worktree_path_populated_on_branch_node(repo: RepoTools):
+    """get_branch_topology() sets worktree_path on the BranchNode for a linked worktree."""
+    from gitplot.repo import GitRepo
+
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature commit")
+    repo.checkout("main")
+
+    wt_path = repo.path.parent / (repo.path.name + "-wt")
+    repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+    topo = GitRepo(str(repo.path)).get_branch_topology()
+    feature_node = next(n for n in topo.nodes if n.name == "feature")
+    assert feature_node.worktree_path == str(wt_path)
+
+
+def test_worktree_no_path_on_branch_without_worktree(repo: RepoTools):
+    """A branch not checked out in any worktree has worktree_path=None."""
+    from gitplot.repo import GitRepo
+
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature commit")
+    repo.checkout("main")
+
+    topo = GitRepo(str(repo.path)).get_branch_topology()
+    feature_node = next(n for n in topo.nodes if n.name == "feature")
+    assert feature_node.worktree_path is None
+
+
+def test_worktree_main_worktree_not_annotated(repo: RepoTools):
+    """The main worktree's branch does not get a worktree annotation (only linked worktrees)."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert "[wt:" not in dg.source
+
+
+# ---------------------------------------------------------------------------
 # Stash support (issue #7)
 # ---------------------------------------------------------------------------
 

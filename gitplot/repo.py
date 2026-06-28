@@ -106,6 +106,7 @@ class BranchNode:
     is_head: bool = False
     is_remote: bool = False
     is_tag: bool = False
+    worktree_path: Optional[str] = None
 
 
 @dataclass
@@ -282,6 +283,8 @@ class GitRepo:
             head_branch = None
             head_commit = None
 
+        worktree_map = self._collect_worktree_map()
+
         for branch in repo.branches:
             try:
                 nodes.append(
@@ -290,6 +293,7 @@ class GitRepo:
                         path=branch.path,
                         commit_hexsha=branch.commit.hexsha,
                         is_head=(head_branch == branch.name),
+                        worktree_path=worktree_map.get(branch.name),
                     )
                 )
             except Exception:
@@ -381,6 +385,36 @@ class GitRepo:
             if len(sha) >= 40 and all(c in "0123456789abcdefABCDEF" for c in sha):
                 entries.append((sha, f"stash@{{{i}}}"))
         return entries
+
+    def _collect_worktree_map(self) -> dict[str, str]:
+        """Return {branch_name: worktree_path} for linked worktrees (excludes the main worktree)."""
+        try:
+            output = self._repo.git.worktree("list", "--porcelain")
+        except Exception:
+            return {}
+
+        # Parse blank-line-separated blocks
+        blocks: list[dict[str, str]] = []
+        current: dict[str, str] = {}
+        for line in output.splitlines():
+            if line == "":
+                if current:
+                    blocks.append(current)
+                    current = {}
+            elif " " in line:
+                key, _, val = line.partition(" ")
+                current[key] = val
+        if current:
+            blocks.append(current)
+
+        # First block is the main worktree — skip it; collect branch->path for the rest
+        result = {}
+        for block in blocks[1:]:
+            path = block.get("worktree", "")
+            branch_ref = block.get("branch", "")
+            if branch_ref.startswith("refs/heads/") and path:
+                result[branch_ref[len("refs/heads/") :]] = path
+        return result
 
     def _collect_refs(self, exclude_remotes: bool, include_stash: bool = False) -> list[RefInfo]:
         """Return refs in traversal order: HEAD, branches, tags, remotes."""
