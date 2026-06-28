@@ -1169,7 +1169,8 @@ def test_worktree_linked_branch_label_contains_path(repo: RepoTools):
     repo._run(["git", "worktree", "add", str(wt_path), "feature"])
 
     dg, _, _, _ = _build(str(repo.path), mode="branch")
-    assert str(wt_path) in dg.source
+    # git always outputs forward-slash paths in porcelain output (even on Windows)
+    assert wt_path.as_posix() in dg.source
 
 
 def test_worktree_annotation_on_node_not_separate_node(repo: RepoTools):
@@ -1186,7 +1187,9 @@ def test_worktree_annotation_on_node_not_separate_node(repo: RepoTools):
 
     dg, _, _, _ = _build(str(repo.path), mode="branch")
     src = dg.source
-    assert str(wt_path) in src
+    # git porcelain always uses forward slashes; compare with as_posix()
+    wt_posix = wt_path.as_posix()
+    assert wt_posix in src
     assert node_in(src, "feature")
 
 
@@ -1206,7 +1209,8 @@ def test_worktree_path_populated_on_branch_node(repo: RepoTools):
 
     topo = GitRepo(str(repo.path)).get_branch_topology()
     feature_node = next(n for n in topo.nodes if n.name == "feature")
-    assert feature_node.worktree_path == str(wt_path)
+    # git porcelain always uses forward slashes for paths (even on Windows)
+    assert feature_node.worktree_path == wt_path.as_posix()
 
 
 def test_worktree_no_path_on_branch_without_worktree(repo: RepoTools):

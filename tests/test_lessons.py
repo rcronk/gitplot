@@ -843,7 +843,8 @@ class TestWorktrees:
         src = dg.source
         assert node_in(src, "feature")
         # DOT label accuracy: the worktree path and annotation marker must both appear
-        assert str(wt_path) in src, "Worktree path must appear in DOT source"
+        # git porcelain always outputs forward-slash paths (even on Windows)
+        assert wt_path.as_posix() in src, "Worktree path must appear in DOT source"
         assert "[wt:" in src, "'[wt:' annotation marker must appear in DOT source"
 
     def test_linked_worktree_annotation_is_in_node_label_not_separate_node(
@@ -864,7 +865,8 @@ class TestWorktrees:
         src = dg.source
         # The path must appear inside a node label (surrounded by label=" ... ")
         # rather than as a standalone token that would indicate a new node.
-        wt_str = str(wt_path)
+        # git porcelain always uses forward slashes (even on Windows)
+        wt_str = wt_path.as_posix()
         assert wt_str in src
         # Confirm the branch node itself still exists with the right ID
         assert node_in(src, "feature")
