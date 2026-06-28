@@ -963,3 +963,128 @@ class TestWorktrees:
         # 'main' is in the main worktree — its label should be "HEAD->main", no [wt:...]
         assert "HEAD->main" in src
         assert "HEAD->main\n[wt:" not in src
+
+
+# ---------------------------------------------------------------------------
+# EP 08 — Interactive Rebase
+# Lesson: interactive rebase lets you squash, drop, or reorder commits before
+#         sharing history.  The resulting commits get new SHAs; ORIG_HEAD records
+#         where the branch was before the rebase as a safety net.
+# ---------------------------------------------------------------------------
+
+
+class TestLesson08InteractiveRebase:
+    def test_squash_collapses_two_commits_into_one(self, repo: RepoTools) -> None:
+        """After squash: one commit replaces two; main no longer reaches old SHAs directly.
+
+        Simulated with git reset --soft + commit, which produces the same graph topology
+        as an interactive rebase squash (one new commit whose parent is the base).
+        """
+        repo.write("base.txt")
+        sha_base = repo.commit("base")
+        repo.write("a.txt")
+        repo.commit("commit A")
+        repo.write("b.txt")
+        repo.commit("commit B")
+
+        # Simulate squash: collapse both A and B into one new commit on top of base
+        repo._run(["git", "reset", "--soft", sha_base])
+        squash_sha = repo.commit("squashed: A + B")
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        # main points at the single squashed commit
+        assert node_in(src, squash_sha)
+        assert edge_in(src, "refs/heads/main", squash_sha)
+        # squashed commit's parent is the base (not the intermediate A or B)
+        assert edge_in(src, squash_sha, sha_base)
+
+    def test_orig_head_after_squash_tracks_pre_squash_tip(self, repo: RepoTools) -> None:
+        """After squash: ORIG_HEAD points at the old tip, keeping discarded SHAs visible.
+
+        git reset --soft (which backs the branch pointer up before replaying) writes
+        ORIG_HEAD to the pre-reset HEAD commit.  This is the same file interactive
+        rebase writes, giving learners a visible safety net in the graph.
+        """
+        repo.write("base.txt")
+        sha_base = repo.commit("base")
+        repo.write("a.txt")
+        sha_a = repo.commit("commit A")
+        repo.write("b.txt")
+        sha_b = repo.commit("commit B")
+
+        repo._run(["git", "reset", "--soft", sha_base])
+        repo.commit("squashed: A + B")
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        # ORIG_HEAD is written by git reset; it keeps sha_b visible
+        assert node_in(src, "ORIG_HEAD"), "ORIG_HEAD must appear after a squash-style reset"
+        assert edge_in(src, "ORIG_HEAD", sha_b), "ORIG_HEAD must point at the pre-squash tip"
+        # sha_b -> sha_a chain is still reachable via ORIG_HEAD
+        assert node_in(src, sha_b)
+        assert node_in(src, sha_a)
+        assert edge_in(src, sha_b, sha_a)
+
+    def test_dropped_commit_is_unreachable_but_orig_head_preserves_it(
+        self, repo: RepoTools
+    ) -> None:
+        """After drop: the commit is unreachable from main but visible via ORIG_HEAD.
+
+        Interactive rebase 'drop' is simulated by resetting the branch before the
+        commit — the same graph effect: dropped SHA is gone from the main chain.
+        """
+        repo.write("a.txt")
+        sha_a = repo.commit("commit A — will be kept")
+        repo.write("b.txt")
+        sha_b = repo.commit("commit B — will be dropped")
+
+        # Drop sha_b by hard-resetting to sha_a
+        repo._run(["git", "reset", "--hard", sha_a])
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        # sha_b is not pointed to by main
+        assert not edge_in(src, "refs/heads/main", sha_b)
+        # sha_a is the new main tip
+        assert edge_in(src, "refs/heads/main", sha_a)
+        # ORIG_HEAD makes sha_b visible in the graph (safety net)
+        assert node_in(src, "ORIG_HEAD")
+        assert edge_in(src, "ORIG_HEAD", sha_b)
+        assert node_in(src, sha_b)
+
+    def test_rebase_gives_new_sha_and_linear_parent_chain(self, repo: RepoTools) -> None:
+        """After rebase: replayed commits have new SHAs; parent is the new base.
+
+        This is the core EP08 lesson: old SHA is gone from the branch ref, new SHA
+        appears with the new base as parent, and ORIG_HEAD preserves the old tip.
+        """
+        repo.write("base.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        old_sha = repo.commit("feature work")
+        repo.checkout("main")
+        repo.write("main_extra.txt")
+        new_base_sha = repo.commit("main extra work")
+
+        repo.checkout("feature")
+        repo._run(["git", "rebase", "main"])
+        new_sha = repo.rev_parse("HEAD")
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        # Rebased commit has a different SHA
+        assert new_sha != old_sha, "Rebase must produce a new SHA"
+        # New SHA is present; parent is main's new tip
+        assert node_in(src, new_sha)
+        assert edge_in(src, new_sha, new_base_sha)
+        # Old SHA is no longer pointed to by refs/heads/feature
+        assert not edge_in(src, "refs/heads/feature", old_sha)
+        # ORIG_HEAD keeps the old tip visible
+        assert node_in(src, "ORIG_HEAD")
+        assert edge_in(src, "ORIG_HEAD", old_sha)
