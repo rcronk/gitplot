@@ -47,6 +47,46 @@ def test_invalid_repo_shows_message():
     assert "no-repo" in dg.source or "No git repo found" in dg.source
 
 
+# ---------------------------------------------------------------------------
+# Empty repo (unborn HEAD) in verbose mode  -- issue #23
+# ---------------------------------------------------------------------------
+
+
+def test_empty_repo_verbose_staged_file_shows_staged_changes_box(repo: RepoTools):
+    """Staged Changes box must appear in verbose mode even before the first commit."""
+    repo.write("README.md", "# Hello")
+    repo._run(["git", "add", "README.md"])
+    # No commit yet -- repo has an unborn HEAD
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert node_in(src, "Staged Changes"), (
+        "Staged Changes box missing on empty repo with a staged file (issue #23)"
+    )
+    assert "README.md" in src
+    assert "no-repo" not in src
+    assert "No git repo found" not in src
+
+
+def test_empty_repo_verbose_untracked_file_shows_untracked_box(repo: RepoTools):
+    """Untracked box must appear in verbose mode even before the first commit."""
+    repo.write("mystery.txt", "not added")
+    # Not staged -- just sitting in the working tree
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert node_in(src, "Untracked"), (
+        "Untracked box missing on empty repo with an untracked file (issue #23)"
+    )
+    assert "mystery.txt" in src
+    assert "no-repo" not in src
+
+
+def test_empty_repo_verbose_no_files_falls_back_to_no_repo(repo: RepoTools):
+    """With nothing staged or untracked, the empty repo still shows the no-repo node."""
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert "no-repo" in src or "No git repo found" in src
+
+
 def test_branch_mode_diverged_shows_fork(repo: RepoTools):
     """Diverged branches are connected through a fork commit node."""
     repo.write("base.txt")

@@ -65,6 +65,16 @@ class GraphBuilder:
         dg.graph_attr["rankdir"] = self.rank_direction
 
         if not graph.commits and not branch_topology:
+            # In verbose mode, still show index state even when the repo has no commits yet
+            # (unborn HEAD after git init -- files can be staged or untracked before the
+            # first commit).
+            if (
+                self.mode == "verbose"
+                and index_state
+                and (index_state.staged or index_state.unstaged or index_state.untracked)
+            ):
+                self._build_index(dg, graph, index_state)
+                return dg
             self._add_node(dg, "no-repo", label="No git repo found", type_key="ref")
             return dg
 
