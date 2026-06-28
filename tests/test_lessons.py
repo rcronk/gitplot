@@ -411,17 +411,21 @@ class TestLesson10CherryPick:
 
 
 class TestLesson11Reflog:
-    def test_reset_hard_removes_commit_from_normal_graph(self, repo: RepoTools) -> None:
-        """After reset --hard: the reset-over commit does not appear in the graph."""
+    def test_reset_hard_leaves_orig_head_pointing_at_pre_reset_commit(
+        self, repo: RepoTools
+    ) -> None:
+        """After reset --hard: ORIG_HEAD keeps the pre-reset commit reachable in the graph."""
         repo.write("a.txt")
         sha1 = repo.commit("first")
         repo.write("b.txt")
-        sha2 = repo.commit("second — will be lost")
+        sha2 = repo.commit("second — backed up by ORIG_HEAD")
         repo._run(["git", "reset", "--hard", "HEAD~1"])
         dg, _, _ = _build(str(repo.path))
         src = dg.source
         assert node_in(src, sha1)
-        assert not node_in(src, sha2)
+        # git reset --hard writes ORIG_HEAD, so sha2 stays visible via that ref
+        assert node_in(src, "ORIG_HEAD")
+        assert edge_in(src, "ORIG_HEAD", sha2)
 
     def test_lost_commit_reappears_when_head_detached_at_it(self, repo: RepoTools) -> None:
         """Detaching HEAD at the 'lost' SHA makes it visible again — the object still exists."""
