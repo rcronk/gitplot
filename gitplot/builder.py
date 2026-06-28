@@ -245,6 +245,11 @@ class GraphBuilder:
             self._add_node(dg, blob_hexsha, label=f"blob\n{blob_hexsha[:hl]}", type_key="blob")
             self._add_edge(dg, tree_hexsha, blob_hexsha, label=name)
 
+        for name, commit_hexsha in td.gitlink_entries:
+            node_id = f"gitlink|{commit_hexsha}"
+            self._add_node(dg, node_id, label=f"gitlink\n{commit_hexsha[:hl]}", type_key="blob")
+            self._add_edge(dg, tree_hexsha, node_id, label=name)
+
         for child_tree_hexsha in td.child_tree_hexshas:
             self._add_tree_recursive(dg, graph, child_tree_hexsha, tree_hexsha, hl)
 

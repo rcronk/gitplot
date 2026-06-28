@@ -1427,3 +1427,110 @@ class TestLesson15Bisect:
         assert edge_in(src, "BISECT_HEAD", sha2), (
             "BISECT_HEAD must point at the midpoint between good sha1 and bad sha3"
         )
+
+
+# EP 16 — git submodules (gitlink entries in verbose mode)
+# Lesson: a submodule is stored as a mode-160000 gitlink entry in the parent tree.
+#         In verbose mode gitplot must render gitlink entries as distinct nodes
+#         (not blobs) so learners can see the pointer into the submodule's history.
+# ---------------------------------------------------------------------------
+
+
+class TestLesson16Submodules:
+    def _setup_with_submodule(self, repo: RepoTools) -> tuple[str, str]:
+        """Create a bare-enough subrepo, add it as a submodule, commit.
+
+        Returns (tree_sha, sub_commit_sha) — the root tree of the parent commit
+        and the commit SHA the gitlink points at.
+        """
+        sub_path = repo.path.parent / (repo.path.name + "_sub")
+        subprocess.check_call(
+            ["git", "init", "-b", "main", str(sub_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        subprocess.check_call(
+            ["git", "config", "user.email", "sub@test"], cwd=sub_path, stderr=subprocess.DEVNULL
+        )
+        subprocess.check_call(
+            ["git", "config", "user.name", "Sub"], cwd=sub_path, stderr=subprocess.DEVNULL
+        )
+        (sub_path / "sub.txt").write_text("sub content", encoding="utf-8")
+        subprocess.check_call(["git", "add", "-A"], cwd=sub_path, stderr=subprocess.DEVNULL)
+        subprocess.check_call(
+            ["git", "commit", "-m", "sub init"], cwd=sub_path, stderr=subprocess.DEVNULL
+        )
+        sub_commit_sha = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=sub_path, stderr=subprocess.DEVNULL
+            )
+            .decode()
+            .strip()
+        )
+
+        # Stage a regular file, add the submodule, then commit everything together
+        repo.write("main.txt")
+        repo._run(["git", "add", "main.txt"])
+        repo._run(
+            [
+                "git",
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "add",
+                sub_path.as_posix(),
+                "lib",
+            ]
+        )
+        repo._run(["git", "commit", "-m", "add submodule"])
+        tree_sha = repo._run(["git", "rev-parse", "HEAD^{tree}"])
+
+        return tree_sha, sub_commit_sha
+
+    def test_submodule_gitlink_does_not_crash_verbose_build(self, repo: RepoTools) -> None:
+        """Verbose build on a repo with a submodule must not raise."""
+        self._setup_with_submodule(repo)
+
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+
+        assert node_in(src, "HEAD")
+        assert node_in(src, "refs/heads/main")
+
+    def test_gitlink_entry_appears_as_distinct_node_in_verbose_mode(self, repo: RepoTools) -> None:
+        """The submodule tree entry appears as a gitlink node, not a blob."""
+        _, sub_commit_sha = self._setup_with_submodule(repo)
+
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+
+        gitlink_node_id = f"gitlink|{sub_commit_sha}"
+        assert node_in(src, gitlink_node_id), (
+            "Submodule entry must appear as a gitlink node with ID gitlink|<sha>"
+        )
+        assert '"gitlink\n' in src, (
+            "Gitlink node label must start with 'gitlink' to distinguish it from blobs"
+        )
+
+    def test_gitlink_edge_from_tree_to_submodule_node(self, repo: RepoTools) -> None:
+        """The parent tree must have an edge to the gitlink node."""
+        tree_sha, sub_commit_sha = self._setup_with_submodule(repo)
+
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+
+        gitlink_node_id = f"gitlink|{sub_commit_sha}"
+        assert edge_in(src, tree_sha, gitlink_node_id), (
+            "Root tree node must have an edge to the gitlink node"
+        )
+
+    def test_non_submodule_blobs_still_render_alongside_gitlink(self, repo: RepoTools) -> None:
+        """Regular blobs in the same commit still appear correctly alongside the gitlink."""
+        _, sub_commit_sha = self._setup_with_submodule(repo)
+
+        dg, _, _ = _build(str(repo.path), mode="verbose")
+        src = dg.source
+
+        gitlink_node_id = f"gitlink|{sub_commit_sha}"
+        assert node_in(src, gitlink_node_id), "Gitlink node must appear"
+        assert '"blob\n' in src, "Regular blob nodes must still appear alongside the gitlink node"
