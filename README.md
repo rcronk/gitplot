@@ -89,6 +89,7 @@ gitplot --mode normal
 - Branch and tag labels next to the commits they point to
 - Merge commits with edges to both parents
 - Collapsed boring chains as summary nodes (e.g. `a1b2c3 (3) f4e5d6`)
+- Special ref nodes: `FETCH_HEAD`, `ORIG_HEAD`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `BISECT_HEAD`, `stash@{N}` — each appears automatically when present in the repo
 - `--commit-details` adds author, message, and date to each commit node
 
 ---
@@ -108,6 +109,7 @@ gitplot --mode branch
 - Direct edge when one branch's tip is a strict ancestor of another's tip
 - A `fork / <sha>` commit node when two branches have diverged from a shared ancestor (the fork commit itself is shown so you know exactly where they split)
 - `HEAD→branchname` label on the currently checked-out branch
+- `[wt: path]` annotation on any branch checked out in a linked worktree (`git worktree add`)
 
 ---
 
@@ -126,7 +128,20 @@ gitplot --mode verbose
 - **Staged Changes** box: files in the index not yet committed, each with their blob SHA
 - **Unstaged Changes** box: modified tracked files not yet staged
 - **Untracked** box: files git doesn't know about yet
+- `gitlink` nodes for git submodule entries (mode-160000 tree entries pointing into a submodule's history)
 - New nodes added since the last render are highlighted in gold (useful in monitor mode)
+
+---
+
+### Mermaid output
+
+To export a [Mermaid](https://mermaid.js.org/) flowchart instead of a Graphviz image, use `--output-format mermaid`. The output is a `.md` file you can paste directly into GitHub, GitLab, or Notion:
+
+```bash
+gitplot --output-format mermaid --output-path diagram.md
+```
+
+All three display modes work with Mermaid output. The file is a fenced ` ```mermaid ``` ` block — open it in any Mermaid-aware renderer.
 
 ---
 
@@ -276,8 +291,8 @@ git add -A && git commit -m "Add src/core.py"
 |---|---|---|
 | `--repo-path PATH` | `.` | Path to the git repository |
 | `--mode {normal,verbose,branch}` | `normal` | Display mode (see above) |
-| `--output-format FORMAT` | `svg` | Graphviz output format: `svg`, `pdf`, `png`, … |
-| `--output-path PATH` | `./gitplot.svg` | Where to write the output file |
+| `--output-format FORMAT` | `svg` | Graphviz format (`svg`, `pdf`, `png`, …) or `mermaid` (writes a Mermaid `.md` file) |
+| `--output-path PATH` | `gitplot.svg` (or `gitplot.md` for mermaid) | Where to write the output file |
 | `--rank-direction {RL,LR,TB,BT}` | `RL` (normal/verbose), `LR` (branch) | Graph layout direction |
 | `--max-commit-depth N` | unlimited | Limit BFS traversal depth per ref |
 | `--exclude-remotes` | off | Omit remote-tracking refs from the graph |
