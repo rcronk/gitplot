@@ -475,7 +475,7 @@ class GitRepo:
         # Remote refs
         if not exclude_remotes:
             try:
-                for rref in repo.remote_refs:
+                for rref in git.RemoteReference.list_items(repo):
                     if rref.path not in seen:
                         seen.add(rref.path)
                         try:

@@ -9,4 +9,8 @@ c61ed" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=
 	c61edbef2405d779b6f3a7bd006e68f095e7ed87 -> "8fb8112ef48db44d2d05e1764e69d43c68e16cf7" [label=parent]
 	"8fb8112ef48db44d2d05e1764e69d43c68e16cf7" [label="commit
 8fb81" color="0.222 1.000 1.000" fillcolor="0.222 0.100 1.000" penwidth=2 style=filled]
+	"refs/remotes/origin/HEAD" [label="origin/HEAD" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"refs/remotes/origin/HEAD" -> c61edbef2405d779b6f3a7bd006e68f095e7ed87 [label=remote]
+	"refs/remotes/origin/main" [label="origin/main" color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	"refs/remotes/origin/main" -> c61edbef2405d779b6f3a7bd006e68f095e7ed87 [label=remote]
 }

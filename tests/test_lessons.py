@@ -13,6 +13,8 @@ Run with:
 
 from __future__ import annotations
 
+import subprocess
+
 from gitplot.builder import GraphBuilder
 from gitplot.repo import GitRepo
 
@@ -36,11 +38,16 @@ def _fork_sha_labels(src: str) -> list[str]:
     return re.findall(r'"?([0-9a-f]{40})"?\s*\[label="fork\n', src)
 
 
-def _build(repo_path: str, mode: str = "normal", **kwargs):
+def _build(
+    repo_path: str,
+    mode: str = "normal",
+    exclude_remotes: bool = False,
+    **kwargs,
+):
     """Build a gitplot graph from a real repo path; return (Digraph, GraphBuilder, RepoGraph)."""
     git_repo = GitRepo(repo_path)
     include_trees = mode == "verbose"
-    graph = git_repo.build_graph(include_trees=include_trees)
+    graph = git_repo.build_graph(include_trees=include_trees, exclude_remotes=exclude_remotes)
     index_state = git_repo.get_index_state() if mode == "verbose" else None
     branch_topo = git_repo.get_branch_topology() if mode == "branch" else None
     builder = GraphBuilder(mode=mode, **kwargs)
@@ -1238,4 +1245,107 @@ class TestLesson12MergeVsRebaseBranchMode:
         # After FF, the two branches are connected by a direct edge (no fork in between)
         assert edge_in(src, "main", "feature") or edge_in(src, "feature", "main"), (
             "After fast-forward merge, main and feature must be directly connected"
+        )
+
+
+# EP 14 — Remote fork workflow
+# Lesson: pushing creates remote tracking refs (refs/remotes/origin/*) that appear
+#         in the graph; local and remote diverge when the local branch advances past
+#         the last push; exclude_remotes hides all remote tracking refs.
+# ---------------------------------------------------------------------------
+
+
+class TestLesson14RemoteFork:
+    def _setup_remote(self, repo: RepoTools) -> None:
+        """Create a bare remote at a sibling directory, add as origin, push main."""
+        remote_path = repo.path.parent / "remote.git"
+        subprocess.check_call(
+            ["git", "init", "--bare", str(remote_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        repo._run(["git", "remote", "add", "origin", str(remote_path)])
+        repo._run(["git", "push", "-u", "origin", "main"])
+
+    def test_remote_tracking_ref_appears_after_push(self, repo: RepoTools) -> None:
+        """After pushing, refs/remotes/origin/main appears as a node pointing at the commit."""
+        repo.write("a.txt")
+        sha1 = repo.commit("initial")
+        self._setup_remote(repo)
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert node_in(src, "refs/remotes/origin/main"), (
+            "refs/remotes/origin/main must appear as a node after push"
+        )
+        assert edge_in(src, "refs/remotes/origin/main", sha1), (
+            "refs/remotes/origin/main must edge to the pushed commit SHA"
+        )
+
+    def test_local_and_remote_tracking_ref_diverge_after_local_commit(
+        self, repo: RepoTools
+    ) -> None:
+        """After a local commit past the last push, local and remote diverge."""
+        repo.write("a.txt")
+        sha1 = repo.commit("initial")
+        self._setup_remote(repo)
+
+        repo.write("b.txt")
+        sha2 = repo.commit("local-only")
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        # local branch has advanced to sha2
+        assert edge_in(src, "refs/heads/main", sha2), (
+            "refs/heads/main must point to the new local commit after divergence"
+        )
+        # remote tracking ref still points to the last-pushed commit
+        assert node_in(src, "refs/remotes/origin/main"), (
+            "refs/remotes/origin/main must still appear after local divergence"
+        )
+        assert edge_in(src, "refs/remotes/origin/main", sha1), (
+            "refs/remotes/origin/main must point to the pre-divergence pushed commit"
+        )
+
+    def test_pushed_feature_branch_shows_remote_ref(self, repo: RepoTools) -> None:
+        """After pushing a feature branch, both local and remote tracking refs appear."""
+        repo.write("a.txt")
+        repo.commit("initial")
+        self._setup_remote(repo)
+
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        sha_feat = repo.commit("feature work")
+        repo._run(["git", "push", "-u", "origin", "feature"])
+
+        dg, _, _ = _build(str(repo.path))
+        src = dg.source
+
+        assert node_in(src, "refs/heads/feature"), "Local refs/heads/feature must appear after push"
+        assert node_in(src, "refs/remotes/origin/feature"), (
+            "refs/remotes/origin/feature must appear after push"
+        )
+        assert edge_in(src, "refs/heads/feature", sha_feat), (
+            "Local feature ref must point to the feature commit"
+        )
+        assert edge_in(src, "refs/remotes/origin/feature", sha_feat), (
+            "Remote tracking ref must point to the same feature commit"
+        )
+
+    def test_remote_refs_hidden_with_exclude_remotes(self, repo: RepoTools) -> None:
+        """With exclude_remotes=True, no refs/remotes/* nodes appear; local refs survive."""
+        repo.write("a.txt")
+        repo.commit("initial")
+        self._setup_remote(repo)
+
+        dg, _, _ = _build(str(repo.path), exclude_remotes=True)
+        src = dg.source
+
+        assert "refs/remotes" not in src, (
+            "With exclude_remotes=True, no refs/remotes/* nodes should appear"
+        )
+        assert node_in(src, "refs/heads/main"), (
+            "Local refs/heads/main must still appear when remotes are excluded"
         )

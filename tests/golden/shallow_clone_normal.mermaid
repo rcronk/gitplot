@@ -3,10 +3,16 @@ flowchart RL
     refs_heads_main["main"]
     c61edbef2405d779b6f3a7bd006e68f095e7ed87["commit<br/>c61ed"]
     8fb8112ef48db44d2d05e1764e69d43c68e16cf7["commit<br/>8fb81"]
+    refs_remotes_origin_HEAD["origin/HEAD"]
+    refs_remotes_origin_main["origin/main"]
     HEAD --> refs_heads_main
     refs_heads_main --> c61edbef2405d779b6f3a7bd006e68f095e7ed87
     c61edbef2405d779b6f3a7bd006e68f095e7ed87 --> 8fb8112ef48db44d2d05e1764e69d43c68e16cf7
+    refs_remotes_origin_HEAD --> c61edbef2405d779b6f3a7bd006e68f095e7ed87
+    refs_remotes_origin_main --> c61edbef2405d779b6f3a7bd006e68f095e7ed87
     style HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style refs_heads_main fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style c61edbef2405d779b6f3a7bd006e68f095e7ed87 fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
     style 8fb8112ef48db44d2d05e1764e69d43c68e16cf7 fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
+    style refs_remotes_origin_HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style refs_remotes_origin_main fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
