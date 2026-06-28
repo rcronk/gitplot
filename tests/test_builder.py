@@ -974,6 +974,175 @@ def test_fetch_head_malformed_no_crash(repo: RepoTools):
 
 
 # ---------------------------------------------------------------------------
+# ORIG_HEAD / MERGE_HEAD / CHERRY_PICK_HEAD support (issue #24)
+# ---------------------------------------------------------------------------
+
+
+def _write_simple_ref(repo_path: Path, name: str, sha: str) -> None:
+    """Write .git/<name> containing sha, simulating a git operation that leaves the ref."""
+    (repo_path / ".git" / name).write_text(sha + "\n")
+
+
+def test_orig_head_normal_mode_ref_node_appears(repo: RepoTools):
+    """ORIG_HEAD appears as a ref node in normal mode when the file exists."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "ORIG_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "ORIG_HEAD")
+
+
+def test_orig_head_normal_mode_edge_to_commit(repo: RepoTools):
+    """ORIG_HEAD ref node has an edge to the commit it points at."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "ORIG_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert edge_in(dg.source, "ORIG_HEAD", sha)
+
+
+def test_orig_head_after_real_reset(repo: RepoTools):
+    """ORIG_HEAD created by git reset --hard points at the pre-reset commit."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("b.txt")
+    sha2 = repo.commit("second")
+    repo._run(["git", "reset", "--hard", "HEAD~1"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "ORIG_HEAD")
+    # ORIG_HEAD records where HEAD was *before* the reset, i.e. the second commit
+    assert edge_in(dg.source, "ORIG_HEAD", sha2)
+
+
+def test_orig_head_absent_no_phantom_node(repo: RepoTools):
+    """When .git/ORIG_HEAD doesn't exist, no ORIG_HEAD node appears."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert "ORIG_HEAD" not in dg.source
+
+
+def test_orig_head_malformed_no_crash(repo: RepoTools):
+    """A malformed ORIG_HEAD file doesn't crash gitplot."""
+    repo.write("a.txt")
+    repo.commit("first")
+    _write_simple_ref(repo.path, "ORIG_HEAD", "not-a-valid-sha")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert isinstance(dg.source, str)
+
+
+def test_merge_head_normal_mode_ref_node_appears(repo: RepoTools):
+    """MERGE_HEAD appears as a ref node in normal mode when the file exists."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "MERGE_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "MERGE_HEAD")
+
+
+def test_merge_head_edge_to_commit(repo: RepoTools):
+    """MERGE_HEAD ref node has an edge to the commit it points at."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "MERGE_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert edge_in(dg.source, "MERGE_HEAD", sha)
+
+
+def test_merge_head_after_real_conflicting_merge(repo: RepoTools):
+    """MERGE_HEAD written by a conflicting merge appears in the graph."""
+    import subprocess
+
+    repo.write("file.txt", "base")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("file.txt", "feature version")
+    feature_sha = repo.commit("feature change")
+    repo.checkout("main")
+    repo.write("file.txt", "main version")
+    repo.commit("main change")
+    try:
+        repo._run(["git", "merge", "feature"])
+    except subprocess.CalledProcessError:
+        pass  # conflict is expected
+    assert (repo.path / ".git" / "MERGE_HEAD").exists(), "git merge should have written MERGE_HEAD"
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "MERGE_HEAD")
+    assert edge_in(dg.source, "MERGE_HEAD", feature_sha)
+
+
+def test_merge_head_absent_no_phantom_node(repo: RepoTools):
+    """When .git/MERGE_HEAD doesn't exist, no MERGE_HEAD node appears."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert "MERGE_HEAD" not in dg.source
+
+
+def test_cherry_pick_head_normal_mode_ref_node_appears(repo: RepoTools):
+    """CHERRY_PICK_HEAD appears as a ref node in normal mode when the file exists."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "CHERRY_PICK_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "CHERRY_PICK_HEAD")
+
+
+def test_cherry_pick_head_edge_to_commit(repo: RepoTools):
+    """CHERRY_PICK_HEAD ref node has an edge to the commit it points at."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "CHERRY_PICK_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert edge_in(dg.source, "CHERRY_PICK_HEAD", sha)
+
+
+def test_cherry_pick_head_after_real_conflicting_cherry_pick(repo: RepoTools):
+    """CHERRY_PICK_HEAD written by a conflicting cherry-pick appears in the graph."""
+    import subprocess
+
+    repo.write("file.txt", "v1")
+    repo.commit("initial")
+    repo.checkout("feature", new=True)
+    repo.write("file.txt", "feature version")
+    feature_sha = repo.commit("feature change")
+    repo.checkout("main")
+    repo.write("file.txt", "main version")
+    repo.commit("main change")
+    try:
+        repo._run(["git", "cherry-pick", feature_sha])
+    except subprocess.CalledProcessError:
+        pass  # conflict is expected
+    assert (repo.path / ".git" / "CHERRY_PICK_HEAD").exists(), (
+        "git cherry-pick should have written CHERRY_PICK_HEAD"
+    )
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "CHERRY_PICK_HEAD")
+    assert edge_in(dg.source, "CHERRY_PICK_HEAD", feature_sha)
+
+
+def test_cherry_pick_head_absent_no_phantom_node(repo: RepoTools):
+    """When .git/CHERRY_PICK_HEAD doesn't exist, no CHERRY_PICK_HEAD node appears."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert "CHERRY_PICK_HEAD" not in dg.source
+
+
+# ---------------------------------------------------------------------------
 # Stash support (issue #7)
 # ---------------------------------------------------------------------------
 

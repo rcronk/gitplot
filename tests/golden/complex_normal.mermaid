@@ -20,6 +20,7 @@ flowchart RL
     refs_tags_v1_0["tag<br/>v1.0"]
     68ab57a3957981ada1d7d99f5ed25152cf0c89d8["tag<br/>68ab5"]
     FETCH_HEAD["FETCH_HEAD"]
+    ORIG_HEAD["ORIG_HEAD"]
     HEAD --> refs_heads_develop
     refs_heads_develop --> 790db164f18098ef413853e56f7d93e70a2c187a
     790db164f18098ef413853e56f7d93e70a2c187a --> 0b18da950bf84d50fbc7562a4747f13094fc85df
@@ -41,6 +42,7 @@ flowchart RL
     refs_tags_v1_0 --> 68ab57a3957981ada1d7d99f5ed25152cf0c89d8
     68ab57a3957981ada1d7d99f5ed25152cf0c89d8 --> de59f3a1667fc051ccc0b0682694585e36040bf4
     FETCH_HEAD --> d18f056029432df7a41eacf452447a111f0f4a12
+    ORIG_HEAD --> 790db164f18098ef413853e56f7d93e70a2c187a
     style HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style refs_heads_develop fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style 790db164f18098ef413853e56f7d93e70a2c187a fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
@@ -62,3 +64,4 @@ flowchart RL
     style refs_tags_v1_0 fill:#fff6e5,stroke:#ffa900,stroke-width:2px
     style 68ab57a3957981ada1d7d99f5ed25152cf0c89d8 fill:#fff6e5,stroke:#ffa900,stroke-width:2px
     style FETCH_HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style ORIG_HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px

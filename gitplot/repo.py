@@ -470,6 +470,19 @@ class GitRepo:
                 )
             )
 
+        # ORIG_HEAD / MERGE_HEAD / CHERRY_PICK_HEAD — written during resets, merges, cherry-picks
+        for special_name in ("ORIG_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD"):
+            sp_sha = self._read_simple_ref(special_name)
+            if sp_sha and special_name not in seen:
+                seen.add(special_name)
+                refs.append(
+                    RefInfo(
+                        path=special_name,
+                        name=special_name,
+                        commit_hexsha=sp_sha,
+                    )
+                )
+
         if include_stash:
             for sha, label in self._collect_stash_entries():
                 path = f"stash/{label}"
@@ -496,6 +509,19 @@ class GitRepo:
             with open(path) as fh:
                 sha = fh.readline().split("\t")[0].strip()
             # Validate: must look like a hex SHA and resolve to a real commit
+            if len(sha) >= 40 and all(c in "0123456789abcdefABCDEF" for c in sha):
+                self._repo.commit(sha)  # raises if not in object store
+                return sha
+        except Exception:
+            pass
+        return None
+
+    def _read_simple_ref(self, name: str) -> Optional[str]:
+        """Return the commit SHA from .git/<name>, or None if absent/invalid."""
+        path = os.path.join(self._repo.git_dir, name)
+        try:
+            with open(path) as fh:
+                sha = fh.readline().strip()
             if len(sha) >= 40 and all(c in "0123456789abcdefABCDEF" for c in sha):
                 self._repo.commit(sha)  # raises if not in object store
                 return sha
