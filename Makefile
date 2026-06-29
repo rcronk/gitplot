@@ -5,9 +5,9 @@ test:
 	pytest tests/ -v
 
 lint:
-	ruff check gitplot/ tests/
+	ruff check visigit/ tests/
 
 format:
-	ruff format gitplot/ tests/
+	ruff format visigit/ tests/
 
 .PHONY: init test lint format

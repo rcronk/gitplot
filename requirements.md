@@ -11,7 +11,7 @@ GitPlot is a command-line tool that generates graphical visualizations of git re
 ### Entry Point
 
 ```
-python gitplot.py [OPTIONS]
+python visigit.py [OPTIONS]
 ```
 
 ### Command-Line Options (current)
@@ -32,7 +32,7 @@ python gitplot.py [OPTIONS]
 
 ### Architecture
 
-Single-file application (`gitplot.py`, ~615 lines) with one primary class `GitPlot` containing:
+Single-file application (`visigit.py`, ~615 lines) with one primary class `GitPlot` containing:
 
 - **Pre-scan phase**: Collects all refs (HEAD, branches, tags, remotes), builds parent→child commit maps, calculates short hash length.
 - **Draw phase**: Iterates refs, recursively traverses commits, adds nodes and edges to a Graphviz `Digraph`, handles collapsing, index state, and untracked files.
@@ -57,9 +57,9 @@ Single-file application (`gitplot.py`, ~615 lines) with one primary class `GitPl
 | File | Purpose |
 |------|---------|
 | `docs/tools.py` | `RepoTools` helper class for building temporary test repos |
-| `docs/git_details.py` | Manual test script that builds a sample repo and runs gitplot |
+| `docs/git_details.py` | Manual test script that builds a sample repo and runs visigit |
 | `docs/display.html` | Auto-refreshing HTML page that polls and displays SVG output |
-| `tests/test_gitplot.py` | Linting-only test suite (pylint + pep8) |
+| `tests/test_visigit.py` | Linting-only test suite (pylint + pep8) |
 | `Makefile` | `init` (pip install) and `test` (nosetests) targets |
 
 ---
@@ -87,7 +87,7 @@ Single-file application (`gitplot.py`, ~615 lines) with one primary class `GitPl
 ### Module structure
 
 ```
-gitplot/
+visigit/
   __init__.py
   cli.py          # Argument parsing, top-level orchestration
   repo.py         # GitRepo: wraps GitPython, provides data model
@@ -104,11 +104,11 @@ gitplot/
 - **`Renderer`** — takes a `Digraph`, writes it to the configured output path, optionally launches a viewer. Handles platform differences.
 - **`Monitor`** — encapsulates watchdog; uses a `threading.Event` for inter-thread signaling (replaces global `DIR_CHANGED`); filters out self-triggered events.
 - **`HighlightTracker`** — in monitor mode, tracks which node IDs appeared since the previous render and passes them to `GraphBuilder` so new nodes can be styled distinctly.
-- **`CLI`** — `argparse`-based entry point; wires the modules together; defines the `gitplot` console script.
+- **`CLI`** — `argparse`-based entry point; wires the modules together; defines the `visigit` console script.
 
 ### Packaging
 
-`pyproject.toml` with a `[project.scripts]` entry point so `gitplot` is available as a command after `pip install`. The package is named `gitplot` and lives in a `gitplot/` package directory. The old single-file `gitplot.py` is removed.
+`pyproject.toml` with a `[project.scripts]` entry point so `visigit` is available as a command after `pip install`. The package is named `visigit` and lives in a `visigit/` package directory. The old single-file `visigit.py` is removed.
 
 ---
 
@@ -132,7 +132,7 @@ gitplot/
 |------|---------|-------------|
 | `--repo-path PATH` | `.` | Path to git repository |
 | `--output-format FORMAT` | `svg` | Output format: svg, pdf, png, etc. |
-| `--output-path PATH` | `./gitplot.svg` | Where to write the output file |
+| `--output-path PATH` | `./visigit.svg` | Where to write the output file |
 | `--rank-direction DIR` | `RL` | Graph layout direction: RL, LR, TB, BT |
 | `--max-commit-depth N` | unlimited | Cap traversal at N commits per ref. Default is unlimited; use to limit very large repos. |
 | `--exclude-remotes` | off | Exclude remote-tracking references |
@@ -203,13 +203,13 @@ Everything in normal mode, plus:
 
 ### Workflow
 
-1. Render initial graph and write to `--output-path` (default `./gitplot.svg`).
+1. Render initial graph and write to `--output-path` (default `./visigit.svg`).
 2. Launch viewer according to `--viewer`:
    - `html`: open `display.html` (bundled with the package) in the default browser. The HTML page polls the SVG path and auto-refreshes.
    - `auto`: try `xdg-open` / `open` / `start` depending on platform; log a warning if unavailable.
    - `none`: write file only.
 3. Watch the repo directory with watchdog.
-4. On change: filter out events caused by gitplot's own output file; re-render and overwrite the SVG.
+4. On change: filter out events caused by visigit's own output file; re-render and overwrite the SVG.
 5. In `--mode verbose`: pass the previous render's node set to `GraphBuilder`; new nodes get a highlight style.
 6. Use `threading.Event` for inter-thread signaling (replaces `DIR_CHANGED` global).
 
@@ -267,7 +267,7 @@ The existing `docs/display.html` is a good foundation. Bundle it into the packag
 - **Visited-commit set**: stop traversing a commit chain once it has already been visited from any ref. This is the primary correctness and performance fix for shared history.
 - **Short-circuit on depth cap**: when `--max-commit-depth N` is set, stop cleanly per ref.
 - **Lazy blob hashing**: only hash blobs for files already known to be modified (index diff), not all workspace files.
-- **Self-trigger filter**: exclude watchdog events for gitplot's own output file to prevent regeneration loops.
+- **Self-trigger filter**: exclude watchdog events for visigit's own output file to prevent regeneration loops.
 - **Cache ref list**: pre-scan is done once per render; avoid redundant GitPython calls within a single render.
 
 ### 4. Features
@@ -293,7 +293,7 @@ In `--mode verbose --monitor`, track node IDs between renders and apply a "new n
 
 #### 4e. Output Improvements
 
-- Fix output path to write `./gitplot.svg` (or `.pdf`, `.png`) in current working directory.
+- Fix output path to write `./visigit.svg` (or `.pdf`, `.png`) in current working directory.
 - `--output-path` flag to override location.
 - `--no-open` flag to suppress viewer launch.
 
@@ -303,7 +303,7 @@ In `--mode verbose --monitor`, track node IDs between renders and apply a "new n
 
 1. **Packaging + module structure** — `pyproject.toml`, module split, entry point. Foundation for everything else.
 2. **Testing infrastructure** — pytest, `RepoTools` fixture, structural assertion helpers. Required before writing new feature code safely.
-3. **Core rewrite: normal mode** — `GitRepo`, `GraphBuilder`, `Renderer`, `CLI`. Replaces current `gitplot.py`. Must pass all normal-mode tests.
+3. **Core rewrite: normal mode** — `GitRepo`, `GraphBuilder`, `Renderer`, `CLI`. Replaces current `visigit.py`. Must pass all normal-mode tests.
 4. **Verbose / educational mode** — trees, blobs, index state, untracked files.
 5. **Branch topology mode** — `--mode branch`, merge-base logic.
 6. **Monitor mode** — watchdog with `threading.Event`, `display.html` viewer, self-trigger filter.
@@ -315,7 +315,7 @@ In `--mode verbose --monitor`, track node IDs between renders and apply a "new n
 
 ## Out of Scope (for now)
 
-- Configuration file (`.gitplotrc`, `pyproject.toml [tool.gitplot]`). Add later if needed.
+- Configuration file (`.visigitrc`, `pyproject.toml [tool.visigit]`). Add later if needed.
 - GUI application (the HTML viewer is sufficient for interactive use).
 - Git hosting integration (GitHub, GitLab PR visualization).
 - Diff visualization (showing what changed between commits).

@@ -20,7 +20,7 @@ class Renderer:
 
     def __init__(
         self,
-        output_path: str = "gitplot.svg",
+        output_path: str = "visigit.svg",
         output_format: str = "svg",
         viewer: str = "html",
     ) -> None:
@@ -86,7 +86,7 @@ class Renderer:
         if self._html_written:
             return  # Already open; SVG polling handles subsequent updates
 
-        html_path = svg_path.parent / "gitplot.html"
+        html_path = svg_path.parent / "visigit.html"
         _write_display_html(html_path, svg_path.name)
         self._open_auto(html_path)
         self._html_written = True
@@ -112,7 +112,7 @@ def _write_display_html(html_path: Path, svg_filename: str) -> None:
     """Write the auto-refreshing display HTML page."""
     # Try to load the bundled template; fall back to inline default.
     try:
-        data = importlib.resources.files("gitplot").joinpath("display.html").read_text()
+        data = importlib.resources.files("visigit").joinpath("display.html").read_text()
         html = data.replace("{{SVG_FILENAME}}", svg_filename)
     except Exception:
         html = _default_html(svg_filename)
@@ -137,7 +137,7 @@ def _default_html(svg_filename: str) -> str:
   </style>
 </head>
 <body>
-  <div id="status">Connecting to gitplot...</div>
+  <div id="status">Connecting to visigit...</div>
   <div id="container"></div>
   <script>
     const SVG = '{svg_filename}';

@@ -1,9 +1,9 @@
 """Walkthrough integration tests for the Visible Git curriculum.
 
-Each test class mirrors a lesson episode and verifies that gitplot produces
+Each test class mirrors a lesson episode and verifies that visigit produces
 the correct DOT graph structure for the git state described in that video.
 
-Running these tests catches gitplot bugs that would cause incorrect diagrams
+Running these tests catches visigit bugs that would cause incorrect diagrams
 during lesson recording. Tests use structural assertions (node/edge presence)
 rather than golden files so they survive cosmetic layout changes.
 
@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import subprocess
 
-from gitplot.builder import GraphBuilder
-from gitplot.repo import GitRepo
+from visigit.builder import GraphBuilder
+from visigit.repo import GitRepo
 
 from .conftest import RepoTools, edge_in, node_in
 
@@ -44,7 +44,7 @@ def _build(
     exclude_remotes: bool = False,
     **kwargs,
 ):
-    """Build a gitplot graph from a real repo path; return (Digraph, GraphBuilder, RepoGraph)."""
+    """Build a visigit graph from a real repo path; return (Digraph, GraphBuilder, RepoGraph)."""
     git_repo = GitRepo(repo_path)
     include_trees = mode == "verbose"
     graph = git_repo.build_graph(include_trees=include_trees, exclude_remotes=exclude_remotes)
@@ -211,7 +211,7 @@ class TestLesson04Merging:
         """Fix #24: an in-progress merge conflict writes MERGE_HEAD into the graph.
 
         When 'git merge' stops with a conflict, git writes .git/MERGE_HEAD pointing
-        at the commit being merged in.  gitplot now surfaces this as a visible ref node.
+        at the commit being merged in.  visigit now surfaces this as a visible ref node.
         """
         import subprocess
 
@@ -475,7 +475,7 @@ class TestLesson10CherryPick:
         """Fix #24: an in-progress cherry-pick conflict writes CHERRY_PICK_HEAD into the graph.
 
         When 'git cherry-pick' stops with a conflict, git writes .git/CHERRY_PICK_HEAD
-        pointing at the commit being applied.  gitplot now surfaces this as a visible ref.
+        pointing at the commit being applied.  visigit now surfaces this as a visible ref.
         """
         import subprocess
 
@@ -533,7 +533,7 @@ class TestLesson10CherryPick:
 
 # ---------------------------------------------------------------------------
 # EP 11 — Reflog: Git's Safety Net
-# Lesson: after reset --hard the commit is unreachable from any ref, so gitplot
+# Lesson: after reset --hard the commit is unreachable from any ref, so visigit
 #         doesn't show it — but it still exists and reappears when you detach HEAD at it.
 # ---------------------------------------------------------------------------
 
@@ -545,7 +545,7 @@ class TestLesson11Reflog:
         """After reset --hard: ORIG_HEAD keeps the pre-reset commit reachable in the graph.
 
         Fix #24: git reset --hard writes .git/ORIG_HEAD pointing at the commit that was
-        HEAD before the reset.  gitplot now reads this file and adds ORIG_HEAD as a ref node,
+        HEAD before the reset.  visigit now reads this file and adds ORIG_HEAD as a ref node,
         so learners can see the safety net git leaves behind.
         """
         repo.write("a.txt")
@@ -923,7 +923,7 @@ class TestWorktrees:
     def test_linked_worktree_branch_label_contains_wt_path(self, repo: RepoTools) -> None:
         """A branch checked out in a linked worktree gets '[wt: <path>]' in its label.
 
-        Feat #25: gitplot reads 'git worktree list --porcelain', skips the main worktree,
+        Feat #25: visigit reads 'git worktree list --porcelain', skips the main worktree,
         and annotates each linked branch node with the worktree directory path.
         """
         repo.write("a.txt")
@@ -1353,7 +1353,7 @@ class TestLesson14RemoteFork:
 
 # EP 15 — git bisect and the Commit Graph
 # Lesson: during an active bisect session git writes .git/BISECT_HEAD pointing
-#         at the commit currently under test; gitplot surfaces it as a ref node
+#         at the commit currently under test; visigit surfaces it as a ref node
 #         so learners can see exactly where bisect has landed in the history.
 # ---------------------------------------------------------------------------
 
@@ -1431,7 +1431,7 @@ class TestLesson15Bisect:
 
 # EP 16 — git submodules (gitlink entries in verbose mode)
 # Lesson: a submodule is stored as a mode-160000 gitlink entry in the parent tree.
-#         In verbose mode gitplot must render gitlink entries as distinct nodes
+#         In verbose mode visigit must render gitlink entries as distinct nodes
 #         (not blobs) so learners can see the pointer into the submodule's history.
 # ---------------------------------------------------------------------------
 
@@ -1537,7 +1537,7 @@ class TestLesson16Submodules:
 
 
 # EP 16 (curriculum) — Force Push Is Destroying Someone's History: Here's the Proof
-# Lesson: gitplot makes the danger concrete by showing local main and origin/main
+# Lesson: visigit makes the danger concrete by showing local main and origin/main
 #         pointing to different commits (diverged state). After a force push,
 #         origin/main resets to the local commit; the displaced commit is orphaned.
 # ---------------------------------------------------------------------------
@@ -1612,7 +1612,7 @@ class TestEP16ForcePush:
             "refs/heads/main must point to the local commit"
         )
         assert node_in(src, "refs/remotes/origin/main"), (
-            "refs/remotes/origin/main must appear -- diverged state is visible in gitplot"
+            "refs/remotes/origin/main must appear -- diverged state is visible in visigit"
         )
         assert edge_in(src, "refs/remotes/origin/main", sha_teammate), (
             "refs/remotes/origin/main must point to the teammate's commit, not the local one"
@@ -1691,9 +1691,9 @@ class TestEP16ForcePush:
 
 
 # EP 20 (curriculum) — All the Way Down: git cat-file, .git/objects, and Pack Files
-# Lesson: gitplot's verbose graph SHA labels correspond directly to what git cat-file
+# Lesson: visigit's verbose graph SHA labels correspond directly to what git cat-file
 #         reports for each object. After git gc packs loose objects, GitPython reads
-#         the pack transparently and gitplot continues to show the full object graph.
+#         the pack transparently and visigit continues to show the full object graph.
 # ---------------------------------------------------------------------------
 
 

@@ -1,4 +1,4 @@
-"""Pytest fixtures for gitplot tests.
+"""Pytest fixtures for visigit tests.
 
 RepoTools builds temporary git repos for use in functional and structural tests.
 """

@@ -17,7 +17,7 @@ from .repo import GitRepo
 
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="gitplot",
+        prog="visigit",
         description="Generate Graphviz visualizations of git repository structure.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -54,7 +54,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         metavar="PATH",
         help=(
             "Where to write the output file. "
-            "Defaults to gitplot.svg (or gitplot.md for --output-format mermaid)."
+            "Defaults to visigit.svg (or visigit.md for --output-format mermaid)."
         ),
     )
     parser.add_argument(
@@ -163,11 +163,11 @@ def main(argv: Optional[list[str]] = None) -> None:
     log_level = logging.DEBUG if args.verbose_log else logging.INFO
     logging.basicConfig(level=log_level, format="%(asctime)s %(levelname)s %(message)s")
 
-    logging.info("gitplot %s", __version__)
+    logging.info("visigit %s", __version__)
     logging.info("mode=%s repo=%s", args.mode, args.repo_path)
 
     if args.output_path is None:
-        args.output_path = "gitplot.md" if args.output_format == "mermaid" else "gitplot.svg"
+        args.output_path = "visigit.md" if args.output_format == "mermaid" else "visigit.svg"
 
     viewer = "none" if args.no_open else args.viewer
     renderer = Renderer(

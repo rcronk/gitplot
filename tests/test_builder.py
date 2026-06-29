@@ -5,8 +5,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from gitplot.builder import GraphBuilder
-from gitplot.repo import (
+from visigit.builder import GraphBuilder
+from visigit.repo import (
     GitRepo,
 )
 
@@ -32,7 +32,7 @@ def _build(repo_path, mode="normal", **kwargs):
 
 def test_invalid_repo_shows_message():
     builder = GraphBuilder(mode="normal")
-    from gitplot.repo import RepoGraph
+    from visigit.repo import RepoGraph
 
     empty = RepoGraph(
         commits={},
@@ -482,7 +482,7 @@ def test_highlight_new_node_not_in_prev_render(repo: RepoTools):
     """Nodes absent from highlight_ids (prev render) receive the new_node color."""
     repo.write("a.txt")
     repo.commit("first")
-    from gitplot.colors import SCHEME
+    from visigit.colors import SCHEME
 
     # Pass an empty frozenset as highlight_ids (prev render had no nodes).
     # sha is NOT in the prev render, so it should be highlighted.
@@ -495,7 +495,7 @@ def test_highlight_old_node_not_highlighted(repo: RepoTools):
     """Nodes present in highlight_ids (prev render) keep their normal color."""
     repo.write("a.txt")
     sha = repo.commit("first")
-    from gitplot.colors import SCHEME
+    from visigit.colors import SCHEME
 
     # Pass sha as already known (in the previous render) — it should NOT be highlighted.
     dg, _, _, _ = _build(str(repo.path), highlight_ids=frozenset({sha}))
@@ -516,7 +516,7 @@ def test_highlight_none_disables_highlighting(repo: RepoTools):
     """When highlight_ids is None, no node receives the new_node color."""
     repo.write("a.txt")
     repo.commit("first")
-    from gitplot.colors import SCHEME
+    from visigit.colors import SCHEME
 
     dg, _, _, _ = _build(str(repo.path), highlight_ids=None)
     new_fill = SCHEME["new_node"].fill
@@ -964,7 +964,7 @@ def test_fetch_head_absent_no_phantom_node(repo: RepoTools):
 
 
 def test_fetch_head_malformed_no_crash(repo: RepoTools):
-    """A malformed FETCH_HEAD file doesn't crash gitplot."""
+    """A malformed FETCH_HEAD file doesn't crash visigit."""
     repo.write("a.txt")
     repo.commit("first")
     (repo.path / ".git" / "FETCH_HEAD").write_text("not-a-valid-sha\n")
@@ -1027,7 +1027,7 @@ def test_orig_head_absent_no_phantom_node(repo: RepoTools):
 
 
 def test_orig_head_malformed_no_crash(repo: RepoTools):
-    """A malformed ORIG_HEAD file doesn't crash gitplot."""
+    """A malformed ORIG_HEAD file doesn't crash visigit."""
     repo.write("a.txt")
     repo.commit("first")
     _write_simple_ref(repo.path, "ORIG_HEAD", "not-a-valid-sha")
@@ -1195,7 +1195,7 @@ def test_worktree_annotation_on_node_not_separate_node(repo: RepoTools):
 
 def test_worktree_path_populated_on_branch_node(repo: RepoTools):
     """get_branch_topology() sets worktree_path on the BranchNode for a linked worktree."""
-    from gitplot.repo import GitRepo
+    from visigit.repo import GitRepo
 
     repo.write("a.txt")
     repo.commit("base")
@@ -1215,7 +1215,7 @@ def test_worktree_path_populated_on_branch_node(repo: RepoTools):
 
 def test_worktree_no_path_on_branch_without_worktree(repo: RepoTools):
     """A branch not checked out in any worktree has worktree_path=None."""
-    from gitplot.repo import GitRepo
+    from visigit.repo import GitRepo
 
     repo.write("a.txt")
     repo.commit("base")

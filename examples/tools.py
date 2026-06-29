@@ -19,7 +19,7 @@ class RepoTools(object):
         os.chdir(old_dir)
         print(
             subprocess.check_output(
-                r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
+                r'python ..\visigit.py --repo-path="%s" --verbose' % self.dir_name
             )
         )
         return output
@@ -33,7 +33,7 @@ class RepoTools(object):
             f.write(self.get_random_string())
         print(
             subprocess.check_output(
-                r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
+                r'python ..\visigit.py --repo-path="%s" --verbose' % self.dir_name
             )
         )
 
@@ -42,7 +42,7 @@ class RepoTools(object):
             f.write(self.get_random_string())
         print(
             subprocess.check_output(
-                r'python ..\gitplot.py --repo-path="%s" --verbose' % self.dir_name
+                r'python ..\visigit.py --repo-path="%s" --verbose' % self.dir_name
             )
         )
 

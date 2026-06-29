@@ -35,9 +35,9 @@ from pathlib import Path
 import graphviz
 import pytest
 
-from gitplot.builder import GraphBuilder
-from gitplot.mermaid import dot_to_mermaid
-from gitplot.repo import GitRepo
+from visigit.builder import GraphBuilder
+from visigit.mermaid import dot_to_mermaid
+from visigit.repo import GitRepo
 
 from .conftest import RepoTools, compare_golden, edge_in, node_in
 

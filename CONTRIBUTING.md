@@ -1,4 +1,4 @@
-# Contributing to gitplot
+# Contributing to visigit
 
 ## Branch model
 
