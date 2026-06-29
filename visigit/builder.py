@@ -65,6 +65,16 @@ class GraphBuilder:
         dg.graph_attr["rankdir"] = self.rank_direction
 
         if not graph.commits and not branch_topology:
+            # In verbose mode, still show index state even when the repo has no commits yet
+            # (unborn HEAD after git init -- files can be staged or untracked before the
+            # first commit).
+            if (
+                self.mode == "verbose"
+                and index_state
+                and (index_state.staged or index_state.unstaged or index_state.untracked)
+            ):
+                self._build_index(dg, graph, index_state)
+                return dg
             self._add_node(dg, "no-repo", label="No git repo found", type_key="ref")
             return dg
 
@@ -235,6 +245,11 @@ class GraphBuilder:
             self._add_node(dg, blob_hexsha, label=f"blob\n{blob_hexsha[:hl]}", type_key="blob")
             self._add_edge(dg, tree_hexsha, blob_hexsha, label=name)
 
+        for name, commit_hexsha in td.gitlink_entries:
+            node_id = f"gitlink|{commit_hexsha}"
+            self._add_node(dg, node_id, label=f"gitlink\n{commit_hexsha[:hl]}", type_key="blob")
+            self._add_edge(dg, tree_hexsha, node_id, label=name)
+
         for child_tree_hexsha in td.child_tree_hexshas:
             self._add_tree_recursive(dg, graph, child_tree_hexsha, tree_hexsha, hl)
 
@@ -284,6 +299,8 @@ class GraphBuilder:
             label = node.name
             if node.is_head:
                 label = f"HEAD->{node.name}"
+            if node.worktree_path:
+                label = f"{label}\n[wt: {node.worktree_path}]"
             self._add_node(dg, node.name, label=label, type_key=type_key)
 
         # Fork commit nodes -- shown as commit-style nodes labelled with short hash

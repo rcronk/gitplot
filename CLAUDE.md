@@ -1,10 +1,10 @@
-# gitplot — AI assistant instructions
+# visigit — AI assistant instructions
 
 ## What this project is
 
-`gitplot` is a Python CLI tool that generates Graphviz (and Mermaid) visualizations of git repository structure. It has three display modes — `normal`, `verbose`, and `branch` — plus a `--monitor` mode that re-renders on every repo change.
+`visigit` is a Python CLI tool that generates Graphviz (and Mermaid) visualizations of git repository structure. It has three display modes — `normal`, `verbose`, and `branch` — plus a `--monitor` mode that re-renders on every repo change.
 
-Key packages: `gitpython` (all git access, isolated in `gitplot/repo.py`), `graphviz` (Python wrapper + system `dot` binary), `watchdog` (filesystem watcher for monitor mode).
+Key packages: `gitpython` (all git access, isolated in `visigit/repo.py`), `graphviz` (Python wrapper + system `dot` binary), `watchdog` (filesystem watcher for monitor mode).
 
 ## Branch model
 
@@ -42,12 +42,12 @@ System dependency: `graphviz` (`apt install graphviz` / `brew install graphviz`)
 
 | File | Responsibility |
 |------|----------------|
-| `gitplot/cli.py` | Argument parsing, entry point |
-| `gitplot/repo.py` | All git access via GitPython; data classes (`CommitData`, `BranchTopology`, etc.) |
-| `gitplot/builder.py` | Converts repo data → Graphviz `Digraph` objects |
-| `gitplot/renderer.py` | Renders the digraph to output (SVG, PNG, PDF, HTML, Mermaid) |
-| `gitplot/monitor.py` | Watchdog-based monitor mode |
-| `gitplot/colors.py` | Color constants and highlight logic |
+| `visigit/cli.py` | Argument parsing, entry point |
+| `visigit/repo.py` | All git access via GitPython; data classes (`CommitData`, `BranchTopology`, etc.) |
+| `visigit/builder.py` | Converts repo data → Graphviz `Digraph` objects |
+| `visigit/renderer.py` | Renders the digraph to output (SVG, PNG, PDF, HTML, Mermaid) |
+| `visigit/monitor.py` | Watchdog-based monitor mode |
+| `visigit/colors.py` | Color constants and highlight logic |
 | `tests/conftest.py` | Shared pytest fixtures (in-memory git repos via GitPython); `node_in`/`edge_in` DOT-source helpers |
 | `tests/test_builder.py` | Structural tests — node/edge presence for all three modes and highlight logic |
 | `tests/test_e2e.py` | E2E golden-file tests; run `pytest --update-golden` to regenerate after intentional output changes |
@@ -58,7 +58,7 @@ System dependency: `graphviz` (`apt install graphviz` / `brew install graphviz`)
 
 ## Key conventions
 
-- All git access goes through `gitplot/repo.py` — never call GitPython directly from `builder.py` or `renderer.py`.
+- All git access goes through `visigit/repo.py` — never call GitPython directly from `builder.py` or `renderer.py`.
 - Tests build real in-memory git repos using `git.Repo.init()` in a `tmp_path` fixture — no mocking of git operations.
 - Helper functions `node_in(source, id)` and `edge_in(source, from_id, to_id)` are in `conftest.py` for asserting DOT source content.
 - `_BRANCH_PRIORITY` in `repo.py` defines which branch is "parent" when two branches share the same commit SHA (used in branch topology).

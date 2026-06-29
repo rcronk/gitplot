@@ -45,6 +45,7 @@ flowchart RL
     refs_tags_v1_0["tag<br/>v1.0"]
     68ab57a3957981ada1d7d99f5ed25152cf0c89d8["tag<br/>68ab5"]
     FETCH_HEAD["FETCH_HEAD"]
+    ORIG_HEAD["ORIG_HEAD"]
     stash_stash__0_["stash@{0}"]
     c33e73c6409632d1e00d353d3496d65cf06675df["commit<br/>c33e7"]
     c2f575b00ce2b17e91b59cc868ad7ccac2a07530["tree<br/>c2f57"]
@@ -143,6 +144,7 @@ flowchart RL
     refs_tags_v1_0 --> 68ab57a3957981ada1d7d99f5ed25152cf0c89d8
     68ab57a3957981ada1d7d99f5ed25152cf0c89d8 --> de59f3a1667fc051ccc0b0682694585e36040bf4
     FETCH_HEAD --> d18f056029432df7a41eacf452447a111f0f4a12
+    ORIG_HEAD --> 790db164f18098ef413853e56f7d93e70a2c187a
     stash_stash__0_ --> c33e73c6409632d1e00d353d3496d65cf06675df
     c33e73c6409632d1e00d353d3496d65cf06675df --> c2f575b00ce2b17e91b59cc868ad7ccac2a07530
     c2f575b00ce2b17e91b59cc868ad7ccac2a07530 -->|"README.md"| 303ddddd86883f5558adc9d682135c455484e2e5
@@ -203,6 +205,7 @@ flowchart RL
     style refs_tags_v1_0 fill:#fff6e5,stroke:#ffa900,stroke-width:2px
     style 68ab57a3957981ada1d7d99f5ed25152cf0c89d8 fill:#fff6e5,stroke:#ffa900,stroke-width:2px
     style FETCH_HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style ORIG_HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style stash_stash__0_ fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style c33e73c6409632d1e00d353d3496d65cf06675df fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
     style c2f575b00ce2b17e91b59cc868ad7ccac2a07530 fill:#e5fff6,stroke:#00ffa9,stroke-width:2px

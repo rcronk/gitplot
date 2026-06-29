@@ -5,8 +5,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from gitplot.builder import GraphBuilder
-from gitplot.repo import (
+from visigit.builder import GraphBuilder
+from visigit.repo import (
     GitRepo,
 )
 
@@ -32,7 +32,7 @@ def _build(repo_path, mode="normal", **kwargs):
 
 def test_invalid_repo_shows_message():
     builder = GraphBuilder(mode="normal")
-    from gitplot.repo import RepoGraph
+    from visigit.repo import RepoGraph
 
     empty = RepoGraph(
         commits={},
@@ -45,6 +45,46 @@ def test_invalid_repo_shows_message():
     )
     dg = builder.build(empty)
     assert "no-repo" in dg.source or "No git repo found" in dg.source
+
+
+# ---------------------------------------------------------------------------
+# Empty repo (unborn HEAD) in verbose mode  -- issue #23
+# ---------------------------------------------------------------------------
+
+
+def test_empty_repo_verbose_staged_file_shows_staged_changes_box(repo: RepoTools):
+    """Staged Changes box must appear in verbose mode even before the first commit."""
+    repo.write("README.md", "# Hello")
+    repo._run(["git", "add", "README.md"])
+    # No commit yet -- repo has an unborn HEAD
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert node_in(src, "Staged Changes"), (
+        "Staged Changes box missing on empty repo with a staged file (issue #23)"
+    )
+    assert "README.md" in src
+    assert "no-repo" not in src
+    assert "No git repo found" not in src
+
+
+def test_empty_repo_verbose_untracked_file_shows_untracked_box(repo: RepoTools):
+    """Untracked box must appear in verbose mode even before the first commit."""
+    repo.write("mystery.txt", "not added")
+    # Not staged -- just sitting in the working tree
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert node_in(src, "Untracked"), (
+        "Untracked box missing on empty repo with an untracked file (issue #23)"
+    )
+    assert "mystery.txt" in src
+    assert "no-repo" not in src
+
+
+def test_empty_repo_verbose_no_files_falls_back_to_no_repo(repo: RepoTools):
+    """With nothing staged or untracked, the empty repo still shows the no-repo node."""
+    dg, _, _, _ = _build(str(repo.path), mode="verbose")
+    src = dg.source
+    assert "no-repo" in src or "No git repo found" in src
 
 
 def test_branch_mode_diverged_shows_fork(repo: RepoTools):
@@ -442,7 +482,7 @@ def test_highlight_new_node_not_in_prev_render(repo: RepoTools):
     """Nodes absent from highlight_ids (prev render) receive the new_node color."""
     repo.write("a.txt")
     repo.commit("first")
-    from gitplot.colors import SCHEME
+    from visigit.colors import SCHEME
 
     # Pass an empty frozenset as highlight_ids (prev render had no nodes).
     # sha is NOT in the prev render, so it should be highlighted.
@@ -455,7 +495,7 @@ def test_highlight_old_node_not_highlighted(repo: RepoTools):
     """Nodes present in highlight_ids (prev render) keep their normal color."""
     repo.write("a.txt")
     sha = repo.commit("first")
-    from gitplot.colors import SCHEME
+    from visigit.colors import SCHEME
 
     # Pass sha as already known (in the previous render) — it should NOT be highlighted.
     dg, _, _, _ = _build(str(repo.path), highlight_ids=frozenset({sha}))
@@ -476,7 +516,7 @@ def test_highlight_none_disables_highlighting(repo: RepoTools):
     """When highlight_ids is None, no node receives the new_node color."""
     repo.write("a.txt")
     repo.commit("first")
-    from gitplot.colors import SCHEME
+    from visigit.colors import SCHEME
 
     dg, _, _, _ = _build(str(repo.path), highlight_ids=None)
     new_fill = SCHEME["new_node"].fill
@@ -924,13 +964,278 @@ def test_fetch_head_absent_no_phantom_node(repo: RepoTools):
 
 
 def test_fetch_head_malformed_no_crash(repo: RepoTools):
-    """A malformed FETCH_HEAD file doesn't crash gitplot."""
+    """A malformed FETCH_HEAD file doesn't crash visigit."""
     repo.write("a.txt")
     repo.commit("first")
     (repo.path / ".git" / "FETCH_HEAD").write_text("not-a-valid-sha\n")
 
     dg, _, _, _ = _build(str(repo.path), mode="normal")
     assert isinstance(dg.source, str)
+
+
+# ---------------------------------------------------------------------------
+# ORIG_HEAD / MERGE_HEAD / CHERRY_PICK_HEAD support (issue #24)
+# ---------------------------------------------------------------------------
+
+
+def _write_simple_ref(repo_path: Path, name: str, sha: str) -> None:
+    """Write .git/<name> containing sha, simulating a git operation that leaves the ref."""
+    (repo_path / ".git" / name).write_text(sha + "\n")
+
+
+def test_orig_head_normal_mode_ref_node_appears(repo: RepoTools):
+    """ORIG_HEAD appears as a ref node in normal mode when the file exists."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "ORIG_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "ORIG_HEAD")
+
+
+def test_orig_head_normal_mode_edge_to_commit(repo: RepoTools):
+    """ORIG_HEAD ref node has an edge to the commit it points at."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "ORIG_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert edge_in(dg.source, "ORIG_HEAD", sha)
+
+
+def test_orig_head_after_real_reset(repo: RepoTools):
+    """ORIG_HEAD created by git reset --hard points at the pre-reset commit."""
+    repo.write("a.txt")
+    repo.commit("first")
+    repo.write("b.txt")
+    sha2 = repo.commit("second")
+    repo._run(["git", "reset", "--hard", "HEAD~1"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "ORIG_HEAD")
+    # ORIG_HEAD records where HEAD was *before* the reset, i.e. the second commit
+    assert edge_in(dg.source, "ORIG_HEAD", sha2)
+
+
+def test_orig_head_absent_no_phantom_node(repo: RepoTools):
+    """When .git/ORIG_HEAD doesn't exist, no ORIG_HEAD node appears."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert "ORIG_HEAD" not in dg.source
+
+
+def test_orig_head_malformed_no_crash(repo: RepoTools):
+    """A malformed ORIG_HEAD file doesn't crash visigit."""
+    repo.write("a.txt")
+    repo.commit("first")
+    _write_simple_ref(repo.path, "ORIG_HEAD", "not-a-valid-sha")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert isinstance(dg.source, str)
+
+
+def test_merge_head_normal_mode_ref_node_appears(repo: RepoTools):
+    """MERGE_HEAD appears as a ref node in normal mode when the file exists."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "MERGE_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "MERGE_HEAD")
+
+
+def test_merge_head_edge_to_commit(repo: RepoTools):
+    """MERGE_HEAD ref node has an edge to the commit it points at."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "MERGE_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert edge_in(dg.source, "MERGE_HEAD", sha)
+
+
+def test_merge_head_after_real_conflicting_merge(repo: RepoTools):
+    """MERGE_HEAD written by a conflicting merge appears in the graph."""
+    import subprocess
+
+    repo.write("file.txt", "base")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("file.txt", "feature version")
+    feature_sha = repo.commit("feature change")
+    repo.checkout("main")
+    repo.write("file.txt", "main version")
+    repo.commit("main change")
+    try:
+        repo._run(["git", "merge", "feature"])
+    except subprocess.CalledProcessError:
+        pass  # conflict is expected
+    assert (repo.path / ".git" / "MERGE_HEAD").exists(), "git merge should have written MERGE_HEAD"
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "MERGE_HEAD")
+    assert edge_in(dg.source, "MERGE_HEAD", feature_sha)
+
+
+def test_merge_head_absent_no_phantom_node(repo: RepoTools):
+    """When .git/MERGE_HEAD doesn't exist, no MERGE_HEAD node appears."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert "MERGE_HEAD" not in dg.source
+
+
+def test_cherry_pick_head_normal_mode_ref_node_appears(repo: RepoTools):
+    """CHERRY_PICK_HEAD appears as a ref node in normal mode when the file exists."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "CHERRY_PICK_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "CHERRY_PICK_HEAD")
+
+
+def test_cherry_pick_head_edge_to_commit(repo: RepoTools):
+    """CHERRY_PICK_HEAD ref node has an edge to the commit it points at."""
+    repo.write("a.txt")
+    sha = repo.commit("first")
+    _write_simple_ref(repo.path, "CHERRY_PICK_HEAD", sha)
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert edge_in(dg.source, "CHERRY_PICK_HEAD", sha)
+
+
+def test_cherry_pick_head_after_real_conflicting_cherry_pick(repo: RepoTools):
+    """CHERRY_PICK_HEAD written by a conflicting cherry-pick appears in the graph."""
+    import subprocess
+
+    repo.write("file.txt", "v1")
+    repo.commit("initial")
+    repo.checkout("feature", new=True)
+    repo.write("file.txt", "feature version")
+    feature_sha = repo.commit("feature change")
+    repo.checkout("main")
+    repo.write("file.txt", "main version")
+    repo.commit("main change")
+    try:
+        repo._run(["git", "cherry-pick", feature_sha])
+    except subprocess.CalledProcessError:
+        pass  # conflict is expected
+    assert (repo.path / ".git" / "CHERRY_PICK_HEAD").exists(), (
+        "git cherry-pick should have written CHERRY_PICK_HEAD"
+    )
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert node_in(dg.source, "CHERRY_PICK_HEAD")
+    assert edge_in(dg.source, "CHERRY_PICK_HEAD", feature_sha)
+
+
+def test_cherry_pick_head_absent_no_phantom_node(repo: RepoTools):
+    """When .git/CHERRY_PICK_HEAD doesn't exist, no CHERRY_PICK_HEAD node appears."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="normal")
+    assert "CHERRY_PICK_HEAD" not in dg.source
+
+
+# ---------------------------------------------------------------------------
+# Worktree annotation in branch mode (issue #25)
+# ---------------------------------------------------------------------------
+
+
+def test_worktree_no_annotation_when_no_linked_worktrees(repo: RepoTools):
+    """With only the main worktree, no worktree annotation appears in branch mode."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert "[wt:" not in dg.source
+
+
+def test_worktree_linked_branch_label_contains_path(repo: RepoTools):
+    """A branch checked out in a linked worktree has its path annotated on the branch node."""
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature commit")
+    repo.checkout("main")
+
+    wt_path = repo.path.parent / (repo.path.name + "-wt")
+    repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    # git always outputs forward-slash paths in porcelain output (even on Windows)
+    assert wt_path.as_posix() in dg.source
+
+
+def test_worktree_annotation_on_node_not_separate_node(repo: RepoTools):
+    """Worktree path appears as part of the branch label, not as a separate node."""
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature commit")
+    repo.checkout("main")
+
+    wt_path = repo.path.parent / (repo.path.name + "-wt")
+    repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    src = dg.source
+    # git porcelain always uses forward slashes; compare with as_posix()
+    wt_posix = wt_path.as_posix()
+    assert wt_posix in src
+    assert node_in(src, "feature")
+
+
+def test_worktree_path_populated_on_branch_node(repo: RepoTools):
+    """get_branch_topology() sets worktree_path on the BranchNode for a linked worktree."""
+    from visigit.repo import GitRepo
+
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature commit")
+    repo.checkout("main")
+
+    wt_path = repo.path.parent / (repo.path.name + "-wt")
+    repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+    topo = GitRepo(str(repo.path)).get_branch_topology()
+    feature_node = next(n for n in topo.nodes if n.name == "feature")
+    # git porcelain always uses forward slashes for paths (even on Windows)
+    assert feature_node.worktree_path == wt_path.as_posix()
+
+
+def test_worktree_no_path_on_branch_without_worktree(repo: RepoTools):
+    """A branch not checked out in any worktree has worktree_path=None."""
+    from visigit.repo import GitRepo
+
+    repo.write("a.txt")
+    repo.commit("base")
+    repo.checkout("feature", new=True)
+    repo.write("b.txt")
+    repo.commit("feature commit")
+    repo.checkout("main")
+
+    topo = GitRepo(str(repo.path)).get_branch_topology()
+    feature_node = next(n for n in topo.nodes if n.name == "feature")
+    assert feature_node.worktree_path is None
+
+
+def test_worktree_main_worktree_not_annotated(repo: RepoTools):
+    """The main worktree's branch does not get a worktree annotation (only linked worktrees)."""
+    repo.write("a.txt")
+    repo.commit("first")
+
+    dg, _, _, _ = _build(str(repo.path), mode="branch")
+    assert "[wt:" not in dg.source
 
 
 # ---------------------------------------------------------------------------

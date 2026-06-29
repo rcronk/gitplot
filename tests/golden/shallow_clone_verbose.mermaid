@@ -7,6 +7,8 @@ flowchart RL
     8fb8112ef48db44d2d05e1764e69d43c68e16cf7["commit<br/>8fb81"]
     71587d436d19a3bab16924de049d5aba0e7e154c["tree<br/>71587"]
     c694117fd4e76c22ae04348c15861413019aa03b["blob<br/>c6941"]
+    refs_remotes_origin_HEAD["origin/HEAD"]
+    refs_remotes_origin_main["origin/main"]
     HEAD --> refs_heads_main
     refs_heads_main --> c61edbef2405d779b6f3a7bd006e68f095e7ed87
     c61edbef2405d779b6f3a7bd006e68f095e7ed87 --> 54d114dcd54f55e58d8b7dff2a1963d0d807b490
@@ -14,6 +16,8 @@ flowchart RL
     c61edbef2405d779b6f3a7bd006e68f095e7ed87 --> 8fb8112ef48db44d2d05e1764e69d43c68e16cf7
     8fb8112ef48db44d2d05e1764e69d43c68e16cf7 --> 71587d436d19a3bab16924de049d5aba0e7e154c
     71587d436d19a3bab16924de049d5aba0e7e154c -->|"file.txt"| c694117fd4e76c22ae04348c15861413019aa03b
+    refs_remotes_origin_HEAD --> c61edbef2405d779b6f3a7bd006e68f095e7ed87
+    refs_remotes_origin_main --> c61edbef2405d779b6f3a7bd006e68f095e7ed87
     style HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style refs_heads_main fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
     style c61edbef2405d779b6f3a7bd006e68f095e7ed87 fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
@@ -22,3 +26,5 @@ flowchart RL
     style 8fb8112ef48db44d2d05e1764e69d43c68e16cf7 fill:#f6ffe5,stroke:#aaff00,stroke-width:2px
     style 71587d436d19a3bab16924de049d5aba0e7e154c fill:#e5fff6,stroke:#00ffa9,stroke-width:2px
     style c694117fd4e76c22ae04348c15861413019aa03b fill:#e5f6ff,stroke:#00a9ff,stroke-width:2px
+    style refs_remotes_origin_HEAD fill:#ffe5e5,stroke:#ff0000,stroke-width:2px
+    style refs_remotes_origin_main fill:#ffe5e5,stroke:#ff0000,stroke-width:2px

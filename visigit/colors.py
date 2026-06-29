@@ -1,4 +1,4 @@
-"""Color scheme for gitplot graph nodes."""
+"""Color scheme for visigit graph nodes."""
 
 from dataclasses import dataclass
 

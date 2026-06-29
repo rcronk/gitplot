@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gitplot.renderer import _default_html, _write_display_html
+from visigit.renderer import _default_html, _write_display_html
 
 
 class TestDisplayHtml:
     """Contract tests for the generated HTML viewer page."""
 
-    def _html(self, tmp_path: Path, filename: str = "gitplot.svg") -> str:
+    def _html(self, tmp_path: Path, filename: str = "visigit.svg") -> str:
         html_path = tmp_path / "display.html"
         _write_display_html(html_path, filename)
         return html_path.read_text(encoding="utf-8")
@@ -42,7 +42,7 @@ class TestDisplayHtml:
         assert "replaceChild" in html or "appendChild" in html
 
     def test_default_html_matches_same_contract(self) -> None:
-        html = _default_html("gitplot.svg")
+        html = _default_html("visigit.svg")
         assert "new Image()" in html
         assert "fetch(" not in html
         assert "onload" in html

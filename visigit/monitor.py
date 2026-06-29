@@ -1,7 +1,7 @@
 """Monitor mode: watches the repo for changes and triggers re-renders.
 
 Uses threading.Event for inter-thread signaling (no global state).
-Filters out filesystem events caused by gitplot's own output to prevent
+Filters out filesystem events caused by visigit's own output to prevent
 self-triggering loops.
 """
 
@@ -87,7 +87,7 @@ class Monitor:
         self._event = threading.Event()
         ignore = {str(output_path.resolve())}
         # Also ignore the companion HTML viewer file
-        ignore.add(str((output_path.parent / "gitplot.html").resolve()))
+        ignore.add(str((output_path.parent / "visigit.html").resolve()))
         self._handler = _RepoEventHandler(self._event, ignore)
         self._observer: Optional[Observer] = None
 

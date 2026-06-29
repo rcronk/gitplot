@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-from gitplot.repo import GitRepo
+from visigit.repo import GitRepo
 
 from .conftest import RepoTools
 

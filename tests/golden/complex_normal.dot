@@ -56,4 +56,6 @@ v1.0" color="0.111 1.000 1.000" fillcolor="0.111 0.100 1.000" penwidth=2 style=f
 	"68ab57a3957981ada1d7d99f5ed25152cf0c89d8" -> de59f3a1667fc051ccc0b0682694585e36040bf4 [label=commit]
 	FETCH_HEAD [label=FETCH_HEAD color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
 	FETCH_HEAD -> d18f056029432df7a41eacf452447a111f0f4a12 [label=remote]
+	ORIG_HEAD [label=ORIG_HEAD color="0.000 1.000 1.000" fillcolor="0.000 0.100 1.000" penwidth=2 style=filled]
+	ORIG_HEAD -> "790db164f18098ef413853e56f7d93e70a2c187a" [label=remote]
 }
