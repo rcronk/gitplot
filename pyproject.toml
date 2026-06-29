@@ -27,7 +27,7 @@ dev = [
 visigit = "visigit.cli:main"
 
 [project.urls]
-Repository = "https://github.com/rcronk/gitplot"
+Repository = "https://github.com/rcronk/visigit"
 
 [tool.setuptools.packages.find]
 where = ["."]
