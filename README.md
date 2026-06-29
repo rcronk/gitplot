@@ -40,7 +40,7 @@ brew install graphviz
 ## Installation
 
 ```bash
-git clone https://github.com/rcronk/gitplot.git
+git clone https://github.com/rcronk/visigit.git
 cd visigit
 pip install -e .
 ```
