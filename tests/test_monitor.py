@@ -6,11 +6,11 @@ import threading
 import time
 from pathlib import Path
 
-from gitplot.monitor import Monitor
+from visigit.monitor import Monitor
 
 
 def _make_monitor(tmp_path: Path) -> Monitor:
-    output_path = tmp_path / "gitplot.svg"
+    output_path = tmp_path / "visigit.svg"
     return Monitor(repo_path=str(tmp_path), output_path=output_path)
 
 
@@ -42,7 +42,7 @@ def test_monitor_wait_returns_after_event(tmp_path: Path) -> None:
 
 def test_monitor_ignores_output_path(tmp_path: Path) -> None:
     """Events for the output file itself are ignored to prevent self-triggering."""
-    output_path = tmp_path / "gitplot.svg"
+    output_path = tmp_path / "visigit.svg"
     mon = Monitor(repo_path=str(tmp_path), output_path=output_path)
     mon._handler._handle(str(output_path))
     assert not mon._event.is_set(), "Events on the output file must be filtered"

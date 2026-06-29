@@ -9,7 +9,7 @@ import re
 def dot_to_mermaid(dot_source: str) -> str:
     """Convert a DOT digraph string to a Mermaid flowchart string.
 
-    Handles the predictable output produced by gitplot's GraphBuilder:
+    Handles the predictable output produced by visigit's GraphBuilder:
     quoted and unquoted node IDs, quoted and unquoted label values, HSV
     fill/stroke colours, and labelled edges.  Node IDs containing
     Mermaid-unsafe characters (/, @, {, }) are sanitised; display labels

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from gitplot.builder import GraphBuilder
-from gitplot.mermaid import dot_to_mermaid
-from gitplot.repo import GitRepo
+from visigit.builder import GraphBuilder
+from visigit.mermaid import dot_to_mermaid
+from visigit.repo import GitRepo
 
 from .conftest import RepoTools
 
@@ -133,7 +133,7 @@ def test_mermaid_integration_has_style_lines(repo: RepoTools):
     graph = GitRepo(str(repo.path)).build_graph()
     builder = GraphBuilder(mode="normal", rank_direction="RL", output_format="mermaid")
     dg = builder.build(graph)
-    from gitplot.mermaid import dot_to_mermaid
+    from visigit.mermaid import dot_to_mermaid
 
     out = dot_to_mermaid(dg.source)
     assert "style " in out

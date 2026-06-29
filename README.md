@@ -1,6 +1,6 @@
-# gitplot
+# visigit
 
-**gitplot** turns any git repository into a live Graphviz diagram. Whether you're learning why `git reset --hard` wipes your work, exploring a tangled branch topology, or teaching someone how git actually stores files as a tree of objects — gitplot shows you what's happening inside the repo.
+**visigit** turns any git repository into a live Graphviz diagram. Whether you're learning why `git reset --hard` wipes your work, exploring a tangled branch topology, or teaching someone how git actually stores files as a tree of objects — visigit shows you what's happening inside the repo.
 
 ---
 
@@ -41,11 +41,11 @@ brew install graphviz
 
 ```bash
 git clone https://github.com/rcronk/gitplot.git
-cd gitplot
+cd visigit
 pip install -e .
 ```
 
-This installs the `gitplot` command globally in your Python environment.
+This installs the `visigit` command globally in your Python environment.
 
 ---
 
@@ -53,22 +53,22 @@ This installs the `gitplot` command globally in your Python environment.
 
 ```bash
 # Snapshot of the current directory's repo
-gitplot
+visigit
 
 # Pick a specific repo
-gitplot --repo-path /path/to/some/repo
+visigit --repo-path /path/to/some/repo
 
 # Open a specific mode
-gitplot --mode branch
-gitplot --mode verbose
+visigit --mode branch
+visigit --mode verbose
 
 # Watch for changes and re-render automatically
-gitplot --monitor
+visigit --monitor
 ```
 
-By default gitplot writes `gitplot.svg` and opens it in an auto-refreshing browser page. Use `--no-open` to skip opening the viewer, or `--output-path` to write to a different location.
+By default visigit writes `visigit.svg` and opens it in an auto-refreshing browser page. Use `--no-open` to skip opening the viewer, or `--output-path` to write to a different location.
 
-> **WSL2 users:** The default `--viewer html` opens a browser page that polls the SVG file every second. This works without `xdg-open`. If you use Windows-side Chrome or Edge, the file path will be something like `\\wsl$\Ubuntu\tmp\gitplot.html`.
+> **WSL2 users:** The default `--viewer html` opens a browser page that polls the SVG file every second. This works without `xdg-open`. If you use Windows-side Chrome or Edge, the file path will be something like `\\wsl$\Ubuntu\tmp\visigit.html`.
 
 ---
 
@@ -79,7 +79,7 @@ By default gitplot writes `gitplot.svg` and opens it in an auto-refreshing brows
 Shows the commit DAG with refs (branches, tags, HEAD) attached to their commits. Long chains of "boring" commits — single parent, single child, no refs — are automatically collapsed into a `LAST (N) FIRST` summary node so the graph stays readable.
 
 ```bash
-gitplot --mode normal
+visigit --mode normal
 ```
 
 ![Normal mode](docs/screenshots/normal-mode.svg)
@@ -99,7 +99,7 @@ gitplot --mode normal
 Shows only branch names and their topological relationships — who branched from whom. Each node is a branch tip; edges show ancestry or fork points. Use this to understand the shape of a multi-branch project at a glance.
 
 ```bash
-gitplot --mode branch
+visigit --mode branch
 ```
 
 ![Branch mode](docs/screenshots/branch-mode.svg)
@@ -118,7 +118,7 @@ gitplot --mode branch
 Shows the full git object model: commits, trees (directories), blobs (files), and the index (staged/unstaged/untracked files). Use this to understand how git actually stores your project — every `git add` and `git commit` becomes visible as a new object in the graph.
 
 ```bash
-gitplot --mode verbose
+visigit --mode verbose
 ```
 
 ![Verbose mode](docs/screenshots/verbose-mode.svg)
@@ -138,7 +138,7 @@ gitplot --mode verbose
 To export a [Mermaid](https://mermaid.js.org/) flowchart instead of a Graphviz image, use `--output-format mermaid`. The output is a `.md` file you can paste directly into GitHub, GitLab, or Notion:
 
 ```bash
-gitplot --output-format mermaid --output-path diagram.md
+visigit --output-format mermaid --output-path diagram.md
 ```
 
 All three display modes work with Mermaid output. The file is a fenced ` ```mermaid ``` ` block — open it in any Mermaid-aware renderer.
@@ -147,10 +147,10 @@ All three display modes work with Mermaid output. The file is a fenced ` ```merm
 
 ## Monitor Mode — Live View
 
-Add `--monitor` to any mode and gitplot watches the repository for filesystem changes. Every time you run a git command in another terminal, the graph re-renders automatically. New nodes since the last render are highlighted in gold.
+Add `--monitor` to any mode and visigit watches the repository for filesystem changes. Every time you run a git command in another terminal, the graph re-renders automatically. New nodes since the last render are highlighted in gold.
 
 ```bash
-gitplot --monitor --viewer html
+visigit --monitor --viewer html
 ```
 
 Open a second terminal window alongside the browser. Run git commands there; watch the diagram update.
@@ -161,13 +161,13 @@ Open a second terminal window alongside the browser. Run git commands there; wat
 
 This walkthrough covers the git commands that confuse people most — `branch`, `merge`, `reset`, and `rebase` — and lets you watch exactly what happens to the commit graph with each one.
 
-**Terminal A — start gitplot:**
+**Terminal A — start visigit:**
 ```bash
 mkdir /tmp/git-lab && cd /tmp/git-lab
 git init -b main
 git config user.email "you@example.com"
 git config user.name "Your Name"
-gitplot --monitor --viewer html --repo-path /tmp/git-lab
+visigit --monitor --viewer html --repo-path /tmp/git-lab
 ```
 
 **Terminal B — run commands and watch the graph:**
@@ -224,13 +224,13 @@ git rebase main
 
 This walkthrough uses verbose mode to reveal git's object model — how every file you stage and commit becomes a blob, tree, and commit object with a content-addressable SHA.
 
-**Terminal A — start gitplot in verbose mode:**
+**Terminal A — start visigit in verbose mode:**
 ```bash
 mkdir /tmp/learn-git && cd /tmp/learn-git
 git init -b main
 git config user.email "you@example.com"
 git config user.name "Your Name"
-gitplot --mode verbose --monitor --viewer html --repo-path /tmp/learn-git
+visigit --mode verbose --monitor --viewer html --repo-path /tmp/learn-git
 ```
 
 **Terminal B — run commands and watch the object graph:**
@@ -292,7 +292,7 @@ git add -A && git commit -m "Add src/core.py"
 | `--repo-path PATH` | `.` | Path to the git repository |
 | `--mode {normal,verbose,branch}` | `normal` | Display mode (see above) |
 | `--output-format FORMAT` | `svg` | Graphviz format (`svg`, `pdf`, `png`, …) or `mermaid` (writes a Mermaid `.md` file) |
-| `--output-path PATH` | `gitplot.svg` (or `gitplot.md` for mermaid) | Where to write the output file |
+| `--output-path PATH` | `visigit.svg` (or `visigit.md` for mermaid) | Where to write the output file |
 | `--rank-direction {RL,LR,TB,BT}` | `RL` (normal/verbose), `LR` (branch) | Graph layout direction |
 | `--max-commit-depth N` | unlimited | Limit BFS traversal depth per ref |
 | `--exclude-remotes` | off | Omit remote-tracking refs from the graph |

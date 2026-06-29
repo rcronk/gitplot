@@ -2,7 +2,7 @@
 
 **Series tagline:** *Stop memorizing commands. Start seeing what they do.*
 
-Every episode runs `gitplot --monitor` in one terminal while git commands run in another.
+Every episode runs `visigit --monitor` in one terminal while git commands run in another.
 The diagram updates live. Viewers watch the DAG change rather than guessing what happened.
 
 ---
@@ -40,7 +40,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 01 — Setup — See Your Git: Setting Up a Live Repository Visualizer
 
-**gitplot mode:** demo of all three  
+**visigit mode:** demo of all three  
 **Target length:** 5–8 min  
 **Commands covered:** git init, pip install
 
@@ -48,17 +48,17 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > See Your Git: Live Repository Diagrams That Update as You Type Commands
 
 #### YouTube Description
-> Stop guessing what git commands do — watch them happen. This video sets up gitplot, a free tool that turns any git repository into a live diagram. Every command you run updates the graph in real time. Install it in under five minutes and you'll never memorize git blindly again.
+> Stop guessing what git commands do — watch them happen. This video sets up visigit, a free tool that turns any git repository into a live diagram. Every command you run updates the graph in real time. Install it in under five minutes and you'll never memorize git blindly again.
 
 #### Outline
 | Time | Section |
 |------|---------|
 | 0:00 | Hook: show monitor mode updating live as git commands run |
-| 0:45 | What gitplot is and why it exists |
+| 0:45 | What visigit is and why it exists |
 | 1:30 | Prerequisites: git, Python 3.9+, graphviz (`apt install graphviz`) |
-| 2:30 | Install gitplot (`pip install -e .` or from source) |
-| 3:30 | Quick demo: `gitplot` on an existing repo — three modes at a glance |
-| 4:30 | Set up the two-terminal workflow: gitplot in Terminal A, git in Terminal B |
+| 2:30 | Install visigit (`pip install -e .` or from source) |
+| 3:30 | Quick demo: `visigit` on an existing repo — three modes at a glance |
+| 4:30 | Set up the two-terminal workflow: visigit in Terminal A, git in Terminal B |
 | 5:30 | Teaser of what's coming in the series |
 
 #### Key Visual Moments
@@ -75,7 +75,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 02 — Beginner — Your First Repository: Watching the Graph Appear
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 10–12 min  
 **Commands covered:** git init, git status, git add, git commit, git log
 
@@ -83,12 +83,12 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git init, add, commit — Watch the Commit Graph Build Itself in Real Time
 
 #### YouTube Description
-> You've run git init and git commit a hundred times. But do you know what they actually create? This video uses gitplot to show you the moment HEAD, a branch ref, and your first commit node appear in the graph — and how the chain grows with every new commit. By the end you'll understand exactly what git status and git log are reporting.
+> You've run git init and git commit a hundred times. But do you know what they actually create? This video uses visigit to show you the moment HEAD, a branch ref, and your first commit node appear in the graph — and how the chain grows with every new commit. By the end you'll understand exactly what git status and git log are reporting.
 
 #### Outline
 | Time | Section |
 |------|---------|
-| 0:00 | Start the monitor: `gitplot --monitor --viewer html` in Terminal A |
+| 0:00 | Start the monitor: `visigit --monitor --viewer html` in Terminal A |
 | 0:45 | `git init -b main` — graph is empty, why? |
 | 1:30 | Create a file, `git status` — untracked, nothing in graph yet |
 | 2:15 | `git add README.md` — still nothing? (staging doesn't create a commit) |
@@ -111,7 +111,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 03 — Beginner — Branches Aren't Copies: What Branching Really Does
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 10–13 min  
 **Commands covered:** git branch, git checkout -b, git switch -c, git switch, git checkout
 
@@ -119,7 +119,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git branch Doesn't Copy Anything — Here's What It Actually Does to Your Repository
 
 #### YouTube Description
-> Most people think creating a branch copies their code. It doesn't — it creates a single pointer to an existing commit. Watch gitplot show you the exact moment a branch label appears in the graph and how it splits from its sibling when you make your first commit. This one diagram will change how you think about branches forever.
+> Most people think creating a branch copies their code. It doesn't — it creates a single pointer to an existing commit. Watch visigit show you the exact moment a branch label appears in the graph and how it splits from its sibling when you make your first commit. This one diagram will change how you think about branches forever.
 
 #### Outline
 | Time | Section |
@@ -146,7 +146,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 04 — Beginner — The Merge Diamond: Fast-Forward vs No-Fast-Forward
 
-**gitplot mode:** normal (commit chain) + branch (topology)  
+**visigit mode:** normal (commit chain) + branch (topology)  
 **Target length:** 12–15 min  
 **Commands covered:** git merge, git merge --no-ff
 
@@ -154,7 +154,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git merge --no-ff Creates a Diamond — Here's What That Means and Why It Matters
 
 #### YouTube Description
-> There are two completely different graph shapes that can result from a merge: a straight line (fast-forward) or a diamond (no-fast-forward). This video shows both side by side in gitplot so you can see exactly when git moves a pointer vs when it creates a real merge commit — and why that choice affects your project history permanently.
+> There are two completely different graph shapes that can result from a merge: a straight line (fast-forward) or a diamond (no-fast-forward). This video shows both side by side in visigit so you can see exactly when git moves a pointer vs when it creates a real merge commit — and why that choice affects your project history permanently.
 
 #### Outline
 | Time | Section |
@@ -182,7 +182,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 05 — Beginner — Reset Demystified: Three Pointer Moves, Not Three Commands
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 12–14 min  
 **Commands covered:** git reset --soft, git reset --mixed, git reset --hard
 
@@ -190,7 +190,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git reset --soft vs --mixed vs --hard: Watch the Branch Pointer Move Three Different Ways
 
 #### YouTube Description
-> git reset is one of the most feared commands in git — and the most misunderstood. All three modes do the same thing to the branch pointer (move it back). What they differ on is how much of your work they preserve. Watch gitplot show you exactly what disappears from the graph at each level, and you'll never confuse the three modes again.
+> git reset is one of the most feared commands in git — and the most misunderstood. All three modes do the same thing to the branch pointer (move it back). What they differ on is how much of your work they preserve. Watch visigit show you exactly what disappears from the graph at each level, and you'll never confuse the three modes again.
 
 #### Outline
 | Time | Section |
@@ -218,7 +218,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 06 — Beginner — Don't Panic: Detached HEAD Explained and Escaped
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 10–12 min  
 **Commands covered:** git checkout SHA, git switch --detach, git checkout -b recovery, git switch -
 
@@ -226,7 +226,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > "You are in 'detached HEAD' state" — What It Means and How to Escape
 
 #### YouTube Description
-> "You are in 'detached HEAD' state" is one of the most alarming messages in git. But it's not dangerous — it just means HEAD is pointing directly at a commit instead of through a branch. Watch gitplot show you exactly what detached HEAD looks like in the graph, what happens to commits you make in that state, and the two ways to safely get back.
+> "You are in 'detached HEAD' state" is one of the most alarming messages in git. But it's not dangerous — it just means HEAD is pointing directly at a commit instead of through a branch. Watch visigit show you exactly what detached HEAD looks like in the graph, what happens to commits you make in that state, and the two ways to safely get back.
 
 #### Outline
 | Time | Section |
@@ -257,7 +257,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 07 — Intermediate — Merge vs Rebase: Same Code, Completely Different History
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 13–15 min  
 **Commands covered:** git merge --no-ff, git rebase, git log --oneline --graph
 
@@ -287,13 +287,13 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 - Merge: diamond with merge commit node, two parent edges
 - Rebase: old SHA nodes disappear; new SHA nodes appear in their place
 - Linear history after rebase: single parent chain with no diamond
-- `git log --oneline --graph` terminal output matching the gitplot diagram exactly
+- `git log --oneline --graph` terminal output matching the visigit diagram exactly
 
 ---
 
 ### EP 08 — Intermediate — origin/main Is Not main: Remote Tracking Branches
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 12–14 min  
 **Commands covered:** git remote add, git fetch, git pull, git push, git branch -vv
 
@@ -301,7 +301,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > origin/main Is Not main — How git fetch, pull, and push Move the Remote Tracking Pointer
 
 #### YouTube Description
-> There are actually two "main" branches in a typical repo: your local main and origin/main (the remote tracking ref). Most people conflate them until something goes wrong. This video uses gitplot to show you both refs in the same graph, what happens when they drift apart, and exactly what fetch, pull, and push do to each pointer.
+> There are actually two "main" branches in a typical repo: your local main and origin/main (the remote tracking ref). Most people conflate them until something goes wrong. This video uses visigit to show you both refs in the same graph, what happens when they drift apart, and exactly what fetch, pull, and push do to each pointer.
 
 #### Outline
 | Time | Section |
@@ -328,7 +328,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 09 — Intermediate — Stash Is a Secret Commit: What git stash Actually Creates
 
-**gitplot mode:** verbose  
+**visigit mode:** verbose  
 **Target length:** 10–12 min  
 **Commands covered:** git stash, git stash list, git stash pop, git stash drop, git stash apply
 
@@ -336,13 +336,13 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git stash Creates a Real Commit — You Just Can't See It in Normal Mode
 
 #### YouTube Description
-> git stash feels like a magic shelf that saves your work temporarily. What it actually does is create a special commit hanging off a ref called refs/stash — and that commit is only visible in gitplot's verbose mode. This video shows you the hidden object, how stash entries stack up, and what pop, apply, and drop each do to the graph.
+> git stash feels like a magic shelf that saves your work temporarily. What it actually does is create a special commit hanging off a ref called refs/stash — and that commit is only visible in visigit's verbose mode. This video shows you the hidden object, how stash entries stack up, and what pop, apply, and drop each do to the graph.
 
 #### Outline
 | Time | Section |
 |------|---------|
 | 0:00 | The mystery: where does stashed work go? |
-| 1:00 | Start in verbose monitor mode: `gitplot --mode verbose --monitor` |
+| 1:00 | Start in verbose monitor mode: `visigit --mode verbose --monitor` |
 | 1:45 | Make uncommitted changes on a dirty working tree |
 | 2:30 | `git stash` — watch the refs/stash node appear in the graph |
 | 3:30 | The stash commit: it contains both your staged and unstaged changes |
@@ -364,7 +364,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 10 — Intermediate — Cherry-Pick: Copying a Commit (and Why the SHA Changes)
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 10–12 min  
 **Commands covered:** git cherry-pick, git cherry-pick --no-commit, git cherry-pick --abort
 
@@ -372,7 +372,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git cherry-pick Copies a Commit — But the SHA Changes Every Time. Here's Why.
 
 #### YouTube Description
-> cherry-pick lets you take one specific commit from any branch and replay it somewhere else. But the resulting commit always has a different SHA — even though the changes are identical. This video explains why using gitplot: the parent commit is different, so the content of the commit object is different, so the SHA is different. You'll see it happen live.
+> cherry-pick lets you take one specific commit from any branch and replay it somewhere else. But the resulting commit always has a different SHA — even though the changes are identical. This video explains why using visigit: the parent commit is different, so the content of the commit object is different, so the SHA is different. You'll see it happen live.
 
 #### Outline
 | Time | Section |
@@ -400,7 +400,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 11 — Intermediate — You Didn't Lose It: Finding Commits with git reflog
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 12–14 min  
 **Commands covered:** git reflog, git reset --hard, git checkout SHA, git branch recover
 
@@ -408,18 +408,18 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > You Didn't Lose Your Commits — git reflog Is Git's Secret Safety Net
 
 #### YouTube Description
-> You ran git reset --hard or git rebase and now your commits are "gone." They're not — git keeps every commit in the object store for at least 30 days. git reflog shows you the history of where HEAD has been, giving you the SHA of every commit you've ever had checked out. This video shows you how to find and recover them using gitplot to confirm the work is really still there.
+> You ran git reset --hard or git rebase and now your commits are "gone." They're not — git keeps every commit in the object store for at least 30 days. git reflog shows you the history of where HEAD has been, giving you the SHA of every commit you've ever had checked out. This video shows you how to find and recover them using visigit to confirm the work is really still there.
 
 #### Outline
 | Time | Section |
 |------|---------|
 | 0:00 | The disaster scenario: commits gone after reset --hard |
 | 1:00 | Build a chain: three commits on main |
-| 2:00 | `git reset --hard HEAD~2` — two commit nodes vanish from gitplot |
+| 2:00 | `git reset --hard HEAD~2` — two commit nodes vanish from visigit |
 | 3:00 | Panic: where did they go? |
 | 3:30 | `git reflog` — full history of HEAD positions with SHAs |
 | 4:30 | Find the SHA of the "lost" commit in the reflog output |
-| 5:30 | `git checkout <lost-sha>` — detach HEAD at the commit; it REAPPEARS in gitplot |
+| 5:30 | `git checkout <lost-sha>` — detach HEAD at the commit; it REAPPEARS in visigit |
 | 6:30 | The commit was never deleted — just unreachable from any ref |
 | 7:30 | `git branch recover <lost-sha>` — new branch label rescues the work |
 | 8:30 | `git checkout -` — return to main; the recover branch is still in the graph |
@@ -441,7 +441,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 12 — Advanced — Rewrite History: Interactive Rebase, Squash, and Fixup
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 13–15 min  
 **Commands covered:** git rebase -i HEAD~N, squash, fixup, reword, drop, reorder
 
@@ -449,7 +449,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git rebase -i: Squash, Reorder, and Rewrite Commits — Watch the Graph Change
 
 #### YouTube Description
-> Interactive rebase lets you rewrite your local commit history before sharing it: squash five "WIP" commits into one, fix a typo in a commit message, drop a commit entirely, or reorder them. This video walks through each operation in gitplot so you can see exactly which commit nodes change SHA, which disappear, and which survive untouched.
+> Interactive rebase lets you rewrite your local commit history before sharing it: squash five "WIP" commits into one, fix a typo in a commit message, drop a commit entirely, or reorder them. This video walks through each operation in visigit so you can see exactly which commit nodes change SHA, which disappear, and which survive untouched.
 
 #### Outline
 | Time | Section |
@@ -477,7 +477,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 13 — Advanced — Tags Are Just Pointers (Until They Aren't): Annotated vs Lightweight
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 10–12 min  
 **Commands covered:** git tag, git tag -a, git tag -l, git push --tags, git describe
 
@@ -485,7 +485,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git tag vs git tag -a: Two Different Graph Nodes for Two Different Objects
 
 #### YouTube Description
-> A lightweight tag is just a ref that points to a commit — exactly like a branch, except it doesn't move. An annotated tag is a full git object with its own SHA, author, and message, sitting between the tag ref and the commit. This video shows you both in gitplot's graph so you can see exactly what you're creating and why annotated tags are preferred for releases.
+> A lightweight tag is just a ref that points to a commit — exactly like a branch, except it doesn't move. An annotated tag is a full git object with its own SHA, author, and message, sitting between the tag ref and the commit. This video shows you both in visigit's graph so you can see exactly what you're creating and why annotated tags are preferred for releases.
 
 #### Outline
 | Time | Section |
@@ -511,7 +511,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 14 — Advanced — Binary Search Your Bug: git bisect and the Commit Graph
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 11–13 min  
 **Commands covered:** git bisect start, git bisect good, git bisect bad, git bisect reset, git bisect run
 
@@ -519,7 +519,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git bisect: Binary Search Your Commit History to Find Exactly When a Bug Appeared
 
 #### YouTube Description
-> A bug exists now that didn't exist six months ago. git bisect performs a binary search through your commit history, halving the search space at each step. This video shows the process in gitplot: watch HEAD move through the graph as bisect narrows in on the exact commit that introduced the bug — often in just 7-10 steps through hundreds of commits.
+> A bug exists now that didn't exist six months ago. git bisect performs a binary search through your commit history, halving the search space at each step. This video shows the process in visigit: watch HEAD move through the graph as bisect narrows in on the exact commit that introduced the bug — often in just 7-10 steps through hundreds of commits.
 
 #### Outline
 | Time | Section |
@@ -529,13 +529,13 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 2:00 | `git bisect start` |
 | 2:30 | `git bisect bad` — mark current HEAD as bad |
 | 3:00 | `git bisect good <old-sha>` — mark a known good commit |
-| 3:30 | HEAD moves to the midpoint — watch gitplot show HEAD at the middle commit |
+| 3:30 | HEAD moves to the midpoint — watch visigit show HEAD at the middle commit |
 | 4:30 | Test, mark good or bad; HEAD moves again — bisect halves the range |
 | 6:00 | After log2(16) = 4 steps: bisect identifies the exact commit |
 | 7:00 | `git bisect log` — see the search path |
 | 8:00 | `git bisect reset` — HEAD returns to original position |
 | 9:00 | `git bisect run <test-script>` — fully automated bisect |
-| 10:30 | Real-world tip: use `--max-commit-depth N` in gitplot to limit graph depth during bisect |
+| 10:30 | Real-world tip: use `--max-commit-depth N` in visigit to limit graph depth during bisect |
 
 #### Key Visual Moments
 - HEAD node jumping to the midpoint commit after `git bisect start` + good/bad
@@ -547,7 +547,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 15 — Advanced — Two Branches, One Checkout: git worktree Explained
 
-**gitplot mode:** branch  
+**visigit mode:** branch  
 **Target length:** 10–12 min  
 **Commands covered:** git worktree add, git worktree list, git worktree remove, git worktree prune
 
@@ -555,7 +555,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git worktree: Check Out Two Branches at the Same Time Without Stashing
 
 #### YouTube Description
-> Normally you can only have one branch checked out at a time. git worktree lets you check out additional branches into separate directories on disk — each with its own working tree. You can run a server on main while developing on a feature branch, without stashing or switching. This video uses gitplot's branch mode to show all active worktrees alongside the branch topology.
+> Normally you can only have one branch checked out at a time. git worktree lets you check out additional branches into separate directories on disk — each with its own working tree. You can run a server on main while developing on a feature branch, without stashing or switching. This video uses visigit's branch mode to show all active worktrees alongside the branch topology.
 
 #### Outline
 | Time | Section |
@@ -581,7 +581,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 16 — Advanced — Force Push Is Destroying Someone's History: Here's the Proof
 
-**gitplot mode:** normal  
+**visigit mode:** normal  
 **Target length:** 11–13 min  
 **Commands covered:** git push --force, git push --force-with-lease, git reflog (on remote)
 
@@ -621,7 +621,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 17 — Internals — Inside a Commit: blob, tree, commit — Git's Four Object Types
 
-**gitplot mode:** verbose  
+**visigit mode:** verbose  
 **Target length:** 13–15 min  
 **Commands covered:** git commit (step-by-step observation)
 
@@ -629,14 +629,14 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > Inside a git commit: blob, tree, commit Objects Explained with a Live Object Graph
 
 #### YouTube Description
-> Every git commit creates three types of objects: blobs (file contents), trees (directory listings), and a commit object (metadata + pointer to root tree). This video uses gitplot's verbose mode to show you all three appearing in the graph the moment you run git commit — and explains the fourth object type (annotated tags) while it's fresh. By the end you'll understand exactly what git is storing on disk.
+> Every git commit creates three types of objects: blobs (file contents), trees (directory listings), and a commit object (metadata + pointer to root tree). This video uses visigit's verbose mode to show you all three appearing in the graph the moment you run git commit — and explains the fourth object type (annotated tags) while it's fresh. By the end you'll understand exactly what git is storing on disk.
 
 #### Outline
 | Time | Section |
 |------|---------|
 | 0:00 | The premise: git is a content-addressable object store with a DAG on top |
 | 1:00 | The four object types: blob, tree, commit, tag — brief overview |
-| 2:00 | Start verbose monitor: `gitplot --mode verbose --monitor` |
+| 2:00 | Start verbose monitor: `visigit --mode verbose --monitor` |
 | 3:00 | `echo "hello" > hello.txt && git add hello.txt` — Staged Changes box appears |
 | 4:00 | The blob object: file content hashed with SHA-1 (now SHA-256 capable) |
 | 5:00 | `git commit -m "initial"` — three new nodes appear: commit → tree → blob |
@@ -658,7 +658,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 18 — Internals — Same File, Same SHA: How Git Never Stores the Same Content Twice
 
-**gitplot mode:** verbose  
+**visigit mode:** verbose  
 **Target length:** 11–13 min  
 **Commands covered:** git add, git commit (observing SHA reuse across commits)
 
@@ -693,7 +693,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 19 — Internals — The Staging Area Exposed: What git add Actually Does to the Object Store
 
-**gitplot mode:** verbose  
+**visigit mode:** verbose  
 **Target length:** 12–14 min  
 **Commands covered:** git add, git restore --staged, git rm --cached, git diff --staged
 
@@ -701,7 +701,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git add Creates a Blob Object Before You Even Commit — Watch It Appear in Verbose Mode
 
 #### YouTube Description
-> Most tutorials say "git add stages the file." What it actually does is compute the SHA of your file's content, write a blob object to .git/objects, and record the SHA in the index. The blob exists even before you commit. gitplot's verbose mode makes this visible: the staged file appears in the graph with its blob SHA the moment you run git add — no commit required.
+> Most tutorials say "git add stages the file." What it actually does is compute the SHA of your file's content, write a blob object to .git/objects, and record the SHA in the index. The blob exists even before you commit. visigit's verbose mode makes this visible: the staged file appears in the graph with its blob SHA the moment you run git add — no commit required.
 
 #### Outline
 | Time | Section |
@@ -730,7 +730,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ### EP 20 — Internals — All the Way Down: git cat-file, .git/objects, and Pack Files
 
-**gitplot mode:** verbose + terminal (git cat-file)  
+**visigit mode:** verbose + terminal (git cat-file)  
 **Target length:** 14–16 min  
 **Commands covered:** git cat-file -p/-t/-s, git hash-object, ls .git/objects/, git gc, git verify-pack
 
@@ -738,7 +738,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > What's Actually Inside .git/objects? Unpacking Blobs, Trees, and Commits with git cat-file
 
 #### YouTube Description
-> You've seen the object graph in gitplot. Now let's open the objects themselves. git cat-file -p <sha> prints the raw content of any git object. In this video we crack open blobs, trees, and commits in the terminal alongside the verbose diagram — showing you exactly what bytes are stored on disk and how git's SHA hash is computed. We also explain how pack files compress thousands of loose objects into an efficient bundle.
+> You've seen the object graph in visigit. Now let's open the objects themselves. git cat-file -p <sha> prints the raw content of any git object. In this video we crack open blobs, trees, and commits in the terminal alongside the verbose diagram — showing you exactly what bytes are stored on disk and how git's SHA hash is computed. We also explain how pack files compress thousands of loose objects into an efficient bundle.
 
 #### Outline
 | Time | Section |
@@ -749,7 +749,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 2:30 | A blob: `git cat-file -t <blob-sha>` (type) and `git cat-file -p <blob-sha>` (content) |
 | 3:30 | Content is exactly the file content; SHA is SHA1("blob " + length + "\0" + content) |
 | 4:30 | A tree: `git cat-file -p <tree-sha>` — mode + type + sha + filename per entry |
-| 5:30 | Cross-reference with gitplot verbose graph: tree entries match graph edges |
+| 5:30 | Cross-reference with visigit verbose graph: tree entries match graph edges |
 | 6:30 | A commit: `git cat-file -p <commit-sha>` — tree, parent, author, committer, message |
 | 7:30 | `git hash-object --stdin`: compute SHA for any content |
 | 8:30 | Verify: `echo "hello" | git hash-object --stdin` == blob SHA from earlier commit |
@@ -769,7 +769,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 ## Integration Test Notes
 
 A companion test suite lives at [tests/test_lessons.py](../tests/test_lessons.py).
-Each test class corresponds to a lesson and verifies that gitplot produces the correct
+Each test class corresponds to a lesson and verifies that visigit produces the correct
 DOT structure for the git state described in that episode.
 
 Running the suite:
@@ -778,5 +778,5 @@ pytest tests/test_lessons.py -v
 ```
 
 Tests are structural (node/edge presence in DOT source), not golden-file comparisons,
-so they survive cosmetic layout changes. When a test fails it likely means a gitplot bug
+so they survive cosmetic layout changes. When a test fails it likely means a visigit bug
 would cause the diagram in that lesson to be wrong.

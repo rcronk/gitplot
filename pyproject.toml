@@ -3,8 +3,8 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gitplot"
-version = "0.2.0"
+name = "visigit"
+version = "0.3.0"
 description = "Graphviz visualizations of git repository structure"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -24,17 +24,17 @@ dev = [
 ]
 
 [project.scripts]
-gitplot = "gitplot.cli:main"
+visigit = "visigit.cli:main"
 
 [project.urls]
 Repository = "https://github.com/rcronk/gitplot"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["gitplot*"]
+include = ["visigit*"]
 
 [tool.setuptools.package-data]
-gitplot = ["display.html"]
+visigit = ["display.html"]
 
 [tool.ruff]
 line-length = 100
