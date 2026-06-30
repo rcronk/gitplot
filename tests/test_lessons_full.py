@@ -741,3 +741,151 @@ class TestEP08RemoteTrackingFull:
             (cr, c1, "parent"),
         }
         assert_exact(nodes, edges, expected_nodes, expected_edges, "after fetch")
+
+
+# ---------------------------------------------------------------------------
+# EP 09 -- Stash Is a Secret Commit
+#
+# Mode: verbose (stash refs only collected with include_trees).  Lesson beats:
+# git stash creates a real commit -- actually a merge commit whose parents are
+# the original HEAD and an index commit -- reachable via refs/stash and pointing
+# at the trees/blobs of the stashed content.  Ground truth comes from git plumbing.
+# ---------------------------------------------------------------------------
+
+
+class TestEP09StashFull:
+    def test_stash_full_object_graph(self, repo: RepoTools) -> None:
+        """A stash entry is a merge commit (parents: base + index commit) with its
+        own tree/blob; visigit draws the complete object graph in verbose mode."""
+        repo.write("a.txt", "original")
+        base = repo.commit("base")
+        repo.write("a.txt", "modified")
+        repo._run(["git", "add", "-A"])
+        repo._run(["git", "stash"])
+
+        # Ground truth straight from git plumbing.
+        w = repo.rev_parse("stash@{0}")  # the stash (working-tree) commit
+        index_commit = repo.rev_parse("stash@{0}^2")  # the index parent commit
+        base_tree = repo.rev_parse(f"{base}^{{tree}}")
+        base_blob = repo.rev_parse(f"{base}:a.txt")
+        stash_tree = repo.rev_parse("stash@{0}^{tree}")
+        stash_blob = repo.rev_parse("stash@{0}:a.txt")
+
+        nodes, edges, graph = full_graph(str(repo.path), mode="verbose")
+        stash_ref = next(r for r in graph.refs if "stash" in r.path)
+
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "ORIG_HEAD",  # git stash resets, writing ORIG_HEAD at the base
+            stash_ref.path,
+            base,
+            w,
+            index_commit,
+            base_tree,
+            stash_tree,
+            base_blob,
+            stash_blob,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", base, "branch"),
+            ("ORIG_HEAD", base, ""),
+            (stash_ref.path, w, ""),
+            (base, base_tree, "tree"),
+            (base_tree, base_blob, "a.txt"),
+            (index_commit, base, "parent"),
+            (index_commit, stash_tree, "tree"),
+            (w, base, "parent"),
+            (w, index_commit, "parent"),
+            (w, stash_tree, "tree"),
+            (stash_tree, stash_blob, "a.txt"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "stash verbose")
+
+    def test_stash_absent_in_normal_mode(self, repo: RepoTools) -> None:
+        """In normal mode stash refs are not collected; only the base commit shows.
+
+        (ORIG_HEAD written by the stash also points at base, so it coincides with main.)
+        """
+        repo.write("a.txt", "original")
+        base = repo.commit("base")
+        repo.write("a.txt", "modified")
+        repo._run(["git", "add", "-A"])
+        repo._run(["git", "stash"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "ORIG_HEAD", base}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", base, "branch"),
+            ("ORIG_HEAD", base, ""),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "stash normal mode")
+
+
+# ---------------------------------------------------------------------------
+# EP 17 -- Inside a Commit: blob, tree, commit
+#
+# Mode: verbose.  Lesson beats: a commit points at a root tree; a tree points at
+# blobs (files) and child trees (subdirectories); each directory level is its own
+# tree object.  Ground truth comes from git plumbing (rev-parse).
+# ---------------------------------------------------------------------------
+
+
+class TestEP17ObjectModelFull:
+    def test_single_file_commit_object_graph(self, repo: RepoTools) -> None:
+        """commit -> root tree -> one blob, plus HEAD -> main -> commit."""
+        repo.write("hello.txt", "hello world")
+        c = repo.commit("initial")
+        tree = repo.rev_parse(f"{c}^{{tree}}")
+        blob = repo.rev_parse(f"{c}:hello.txt")
+        nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
+        expected_nodes = {"HEAD", "refs/heads/main", c, tree, blob}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c, "branch"),
+            (c, tree, "tree"),
+            (tree, blob, "hello.txt"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "single file")
+
+    def test_subdirectory_object_graph(self, repo: RepoTools) -> None:
+        """A subdirectory is its own child tree; the edge to it is labelled 'src'."""
+        repo.write("README.md", "# r")
+        repo.write("src/core.py", "x")
+        c = repo.commit("with subdir")
+        root = repo.rev_parse(f"{c}^{{tree}}")
+        src_tree = repo.rev_parse(f"{c}:src")
+        readme = repo.rev_parse(f"{c}:README.md")
+        core = repo.rev_parse(f"{c}:src/core.py")
+        nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
+        expected_nodes = {"HEAD", "refs/heads/main", c, root, src_tree, readme, core}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c, "branch"),
+            (c, root, "tree"),
+            (root, readme, "README.md"),
+            (root, src_tree, "src"),
+            (src_tree, core, "core.py"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "subdirectory")
+
+    def test_nested_subdirectories_object_graph(self, repo: RepoTools) -> None:
+        """Two directory levels: each is its own tree; both edges carry dir names."""
+        repo.write("src/util/helper.py", "y")
+        c = repo.commit("nested")
+        root = repo.rev_parse(f"{c}^{{tree}}")
+        src_tree = repo.rev_parse(f"{c}:src")
+        util_tree = repo.rev_parse(f"{c}:src/util")
+        helper = repo.rev_parse(f"{c}:src/util/helper.py")
+        nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
+        expected_nodes = {"HEAD", "refs/heads/main", c, root, src_tree, util_tree, helper}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c, "branch"),
+            (c, root, "tree"),
+            (root, src_tree, "src"),
+            (src_tree, util_tree, "util"),
+            (util_tree, helper, "helper.py"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "nested subdirs")

@@ -251,17 +251,23 @@ class GraphBuilder:
         hl: int,
     ) -> None:
         """Recursively add tree and blob nodes for verbose mode."""
+        td = graph.trees.get(tree_hexsha)
+        # The root tree (name "/") is reached from a commit and keeps the generic
+        # "tree" edge label.  A subdirectory tree is labelled with its directory
+        # name -- mirroring how blob edges are labelled with the filename, so the
+        # object graph shows the real tree-entry name git stores on disk.
+        edge_label = "tree" if (td is None or td.name == "/") else td.name
+
         if tree_hexsha in self._rendered_nodes:
             # Tree already drawn; still need the edge from this parent
-            self._add_edge(dg, parent_id, tree_hexsha, label="tree")
+            self._add_edge(dg, parent_id, tree_hexsha, label=edge_label)
             return
 
-        td = graph.trees.get(tree_hexsha)
         if td is None:
             return
 
         self._add_node(dg, tree_hexsha, label=f"tree\n{tree_hexsha[:hl]}", type_key="tree")
-        self._add_edge(dg, parent_id, tree_hexsha, label="tree")
+        self._add_edge(dg, parent_id, tree_hexsha, label=edge_label)
 
         for name, blob_hexsha in td.blob_entries:
             self._add_node(dg, blob_hexsha, label=f"blob\n{blob_hexsha[:hl]}", type_key="blob")
