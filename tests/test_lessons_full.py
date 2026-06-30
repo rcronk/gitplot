@@ -194,3 +194,108 @@ class TestEP02FirstRepoFull:
             (summary_id, c0, "parent"),
         }
         assert_exact(nodes, edges, expected_nodes, expected_edges, "boring collapse")
+
+
+# ---------------------------------------------------------------------------
+# EP 03 -- Branches Aren't Copies
+#
+# Mode: normal.  Lesson beats:
+#   - a new branch is just a label on an existing commit -- main is unchanged.
+#   - HEAD moves to the new branch (checkout -b) and back (switch) without any
+#     commit node changing.
+#   - divergence only happens after the first commit on the new branch.
+#   - deleting a branch removes only the label; the commit stays if still reachable.
+# ---------------------------------------------------------------------------
+
+
+class TestEP03BranchingFull:
+    def test_new_branch_shares_commit_with_main(self, repo: RepoTools) -> None:
+        """checkout -b feature: feature + main both label the tip; HEAD -> feature.
+
+        No new commit node appears -- branching does not copy anything.
+        """
+        repo.write("a.txt")
+        c1 = repo.commit("first")
+        repo.write("b.txt")
+        c2 = repo.commit("second")
+        repo.checkout("feature", new=True)
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/heads/feature", c1, c2}
+        expected_edges = {
+            ("HEAD", "refs/heads/feature", "HEAD"),
+            ("refs/heads/feature", c2, "branch"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "checkout -b feature")
+
+    def test_switch_back_to_main_moves_only_head(self, repo: RepoTools) -> None:
+        """switch main: HEAD re-points to main; both labels still on the tip."""
+        repo.write("a.txt")
+        c1 = repo.commit("first")
+        repo.write("b.txt")
+        c2 = repo.commit("second")
+        repo.checkout("feature", new=True)
+        repo.checkout("main")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/heads/feature", c1, c2}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/feature", c2, "branch"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "switch back to main")
+
+    def test_divergence_after_commit_on_feature(self, repo: RepoTools) -> None:
+        """First commit on feature: feature advances; main stays on the shared base."""
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        cf = repo.commit("feature work")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/heads/feature", base, cf}
+        expected_edges = {
+            ("HEAD", "refs/heads/feature", "HEAD"),
+            ("refs/heads/feature", cf, "branch"),
+            (cf, base, "parent"),
+            ("refs/heads/main", base, "branch"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "feature diverges")
+
+    def test_both_branches_diverge_from_shared_base(self, repo: RepoTools) -> None:
+        """Each branch commits once: two tips fork from the same parent commit."""
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        cf = repo.commit("feature work")
+        repo.checkout("main")
+        repo.write("main.txt")
+        cm = repo.commit("main work")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/heads/feature", base, cf, cm}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", cm, "branch"),
+            (cm, base, "parent"),
+            ("refs/heads/feature", cf, "branch"),
+            (cf, base, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "both diverge")
+
+    def test_deleted_branch_label_disappears(self, repo: RepoTools) -> None:
+        """git branch -d temp: only the label is gone; the commit stays (reachable via main)."""
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.checkout("temp", new=True)
+        repo.checkout("main")
+        repo._run(["git", "branch", "-d", "temp"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", base}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", base, "branch"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "branch deleted")
