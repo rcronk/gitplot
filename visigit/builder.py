@@ -132,7 +132,18 @@ class GraphBuilder:
                 type_key = "tag" if ref.is_tag else "ref"
                 label = f"tag\n{ref.name}" if ref.is_tag else ref.name
                 self._add_node(dg, ref_id, label=label, type_key=type_key)
-                edge_label = "branch" if ref.is_branch else "tag" if ref.is_tag else "remote"
+                # Only remote-tracking refs are labelled "remote".  Special pseudo-refs
+                # (ORIG_HEAD, MERGE_HEAD, CHERRY_PICK_HEAD, BISECT_HEAD) are none of
+                # branch/tag/remote and get no edge label -- calling them "remote" was
+                # inaccurate and misleading in lessons.
+                if ref.is_branch:
+                    edge_label = "branch"
+                elif ref.is_tag:
+                    edge_label = "tag"
+                elif ref.is_remote:
+                    edge_label = "remote"
+                else:
+                    edge_label = ""
                 self._add_edge(dg, ref_id, ref.commit_hexsha, label=edge_label)
 
             self._walk_chain(dg, graph, ref.commit_hexsha, rendered_commits, hl)

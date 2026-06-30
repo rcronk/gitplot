@@ -299,3 +299,128 @@ class TestEP03BranchingFull:
             ("refs/heads/main", base, "branch"),
         }
         assert_exact(nodes, edges, expected_nodes, expected_edges, "branch deleted")
+
+
+# ---------------------------------------------------------------------------
+# EP 04 -- The Merge Diamond
+#
+# Modes: normal (commit chain) + branch (topology).  Lesson beats:
+#   - fast-forward: main's label advances to the feature tip; no merge commit.
+#   - no-fast-forward: a merge commit appears with TWO parent edges (the diamond).
+#   - branch mode: a fork node connects the two branch labels.
+#
+# NOTE: git writes ORIG_HEAD on every merge (the pre-merge HEAD), and visigit
+# surfaces it as a safety-net ref (fix #24).  Its edge carries NO label -- it is
+# a pseudo-ref, not a remote-tracking branch.
+# ---------------------------------------------------------------------------
+
+
+class TestEP04MergeFull:
+    def test_fast_forward_merge_normal(self, repo: RepoTools) -> None:
+        """FF merge: main advances to the feature tip; no merge commit node.
+
+        Both refs end on cf; ORIG_HEAD records the pre-merge tip (base).
+        """
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        cf = repo.commit("feat")
+        repo.checkout("main")
+        repo._run(["git", "merge", "feature"])  # fast-forward
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/heads/feature", "ORIG_HEAD", base, cf}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", cf, "branch"),
+            ("refs/heads/feature", cf, "branch"),
+            (cf, base, "parent"),
+            ("ORIG_HEAD", base, ""),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "FF merge normal")
+
+    def test_no_ff_merge_diamond_normal(self, repo: RepoTools) -> None:
+        """no-FF merge: a merge commit with two parent edges -- the diamond.
+
+        cm (merge) -> ch (hotfix) and cm -> cf (feature); both ch and cf -> base.
+        ORIG_HEAD records the pre-merge tip (ch).
+        """
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        cf = repo.commit("feat")
+        repo.checkout("main")
+        repo.write("fix.txt")
+        ch = repo.commit("hotfix")
+        repo.merge("feature", no_ff=True)
+        cm = repo.rev_parse("HEAD")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/heads/feature",
+            "ORIG_HEAD",
+            base,
+            cf,
+            ch,
+            cm,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", cm, "branch"),
+            (cm, ch, "parent"),
+            (cm, cf, "parent"),
+            (ch, base, "parent"),
+            (cf, base, "parent"),
+            ("refs/heads/feature", cf, "branch"),
+            ("ORIG_HEAD", ch, ""),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "no-FF diamond normal")
+
+    def test_diverged_branch_mode_fork_at_base(self, repo: RepoTools) -> None:
+        """Branch mode, diverged: fork node is the common base; fork -> each branch."""
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        repo.commit("feat")
+        repo.checkout("main")
+        repo.write("fix.txt")
+        repo.commit("hotfix")
+        nodes, edges, _ = full_graph(str(repo.path), mode="branch")
+        expected_nodes = {"main", "feature", base}
+        expected_edges = {(base, "main", ""), (base, "feature", "")}
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "branch diverged")
+
+    def test_no_ff_merge_branch_mode_fork_at_feature_tip(self, repo: RepoTools) -> None:
+        """Branch mode after no-FF merge: fork is the merge-base (the feature tip cf),
+        which is now an ancestor of main; fork -> main and fork -> feature."""
+        repo.write("base.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        cf = repo.commit("feat")
+        repo.checkout("main")
+        repo.write("fix.txt")
+        repo.commit("hotfix")
+        repo.merge("feature", no_ff=True)
+        nodes, edges, _ = full_graph(str(repo.path), mode="branch")
+        expected_nodes = {"main", "feature", cf}
+        expected_edges = {(cf, "main", ""), (cf, "feature", "")}
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "branch no-FF merge")
+
+    def test_fast_forward_branch_mode_no_fork(self, repo: RepoTools) -> None:
+        """Branch mode after FF merge: no fork (both tips are the same commit);
+        a direct main -> feature edge connects them."""
+        repo.write("base.txt")
+        repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        repo.commit("feat")
+        repo.checkout("main")
+        repo._run(["git", "merge", "feature"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="branch")
+        expected_nodes = {"main", "feature"}
+        expected_edges = {("main", "feature", "")}
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "branch FF merge")
