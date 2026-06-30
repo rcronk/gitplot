@@ -240,7 +240,8 @@ class GraphBuilder:
         self._add_node(dg, hexsha, label=label, type_key="commit")
 
         if self.mode == "verbose" and cd and cd.tree_hexsha:
-            self._add_tree_recursive(dg, graph, cd.tree_hexsha, hexsha, hl)
+            # A commit points at its root tree; that edge is always labelled "tree".
+            self._add_tree_recursive(dg, graph, cd.tree_hexsha, hexsha, hl, edge_label="tree")
 
     def _add_tree_recursive(
         self,
@@ -249,14 +250,17 @@ class GraphBuilder:
         tree_hexsha: str,
         parent_id: str,
         hl: int,
+        edge_label: str,
     ) -> None:
-        """Recursively add tree and blob nodes for verbose mode."""
+        """Recursively add tree and blob nodes for verbose mode.
+
+        ``edge_label`` is the label for the parent -> this-tree edge, determined by
+        the CALLER's context: "tree" when the parent is a commit (root tree), or the
+        subdirectory's entry name when the parent is a tree.  This is robust even
+        when one tree object is shared as both a root tree and a subdirectory (e.g.
+        a subtree-merged library), which a name-on-the-node scheme would mislabel.
+        """
         td = graph.trees.get(tree_hexsha)
-        # The root tree (name "/") is reached from a commit and keeps the generic
-        # "tree" edge label.  A subdirectory tree is labelled with its directory
-        # name -- mirroring how blob edges are labelled with the filename, so the
-        # object graph shows the real tree-entry name git stores on disk.
-        edge_label = "tree" if (td is None or td.name == "/") else td.name
 
         if tree_hexsha in self._rendered_nodes:
             # Tree already drawn; still need the edge from this parent
@@ -278,8 +282,9 @@ class GraphBuilder:
             self._add_node(dg, node_id, label=f"gitlink\n{commit_hexsha[:hl]}", type_key="blob")
             self._add_edge(dg, tree_hexsha, node_id, label=name)
 
-        for child_tree_hexsha in td.child_tree_hexshas:
-            self._add_tree_recursive(dg, graph, child_tree_hexsha, tree_hexsha, hl)
+        for name, child_tree_hexsha in td.child_tree_entries:
+            # A subdirectory tree edge is labelled with the directory name.
+            self._add_tree_recursive(dg, graph, child_tree_hexsha, tree_hexsha, hl, edge_label=name)
 
     # ------------------------------------------------------------------
     # Index / working tree (verbose mode only)

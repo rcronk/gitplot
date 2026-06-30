@@ -1607,3 +1607,263 @@ class TestConflictAndSpecialObjectsFull:
         assert_exact(nodes, edges, expected_nodes, expected_edges, "submodule gitlink")
         # The gitlink node is labelled "gitlink", distinguishing it from a blob.
         assert labels[gitlink].startswith("gitlink"), f"gitlink label: {labels[gitlink]!r}"
+
+
+# ---------------------------------------------------------------------------
+# EP 05 -- Resolving Merge Conflicts (resolve / abort)
+#
+# Mode: normal.  A conflicting merge writes MERGE_HEAD; resolving + committing
+# produces the merge commit (two parents) and clears MERGE_HEAD; --abort returns
+# to the pre-merge tip.  git merge writes ORIG_HEAD either way.
+# ---------------------------------------------------------------------------
+
+
+class TestEP05MergeConflictResolveFull:
+    def _conflict(self, repo: RepoTools) -> tuple[str, str, str]:
+        import subprocess as sp
+
+        repo.write("f.txt", "base")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("f.txt", "feature")
+        feat = repo.commit("feature change")
+        repo.checkout("main")
+        repo.write("f.txt", "main")
+        main_chg = repo.commit("main change")
+        try:
+            repo._run(["git", "merge", "feature"])
+        except sp.CalledProcessError:
+            pass  # conflict expected
+        return base, feat, main_chg
+
+    def test_resolved_conflict_becomes_merge_commit(self, repo: RepoTools) -> None:
+        """After resolving + committing: a merge commit with two parents; MERGE_HEAD gone."""
+        base, feat, main_chg = self._conflict(repo)
+        repo.write("f.txt", "resolved")  # resolve
+        repo._run(["git", "add", "f.txt"])
+        repo._run(["git", "commit", "--no-edit"])
+        cm = repo.rev_parse("HEAD")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/heads/feature",
+            "ORIG_HEAD",
+            base,
+            feat,
+            main_chg,
+            cm,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", cm, "branch"),
+            (cm, main_chg, "parent"),
+            (cm, feat, "parent"),
+            (main_chg, base, "parent"),
+            (feat, base, "parent"),
+            ("refs/heads/feature", feat, "branch"),
+            ("ORIG_HEAD", main_chg, ""),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "conflict resolved")
+        assert "MERGE_HEAD" not in nodes
+
+    def test_aborted_conflict_returns_to_pre_merge(self, repo: RepoTools) -> None:
+        """git merge --abort: back to the pre-merge tip; MERGE_HEAD gone, no merge commit."""
+        base, feat, main_chg = self._conflict(repo)
+        repo._run(["git", "merge", "--abort"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/heads/feature",
+            "ORIG_HEAD",
+            base,
+            feat,
+            main_chg,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", main_chg, "branch"),
+            (main_chg, base, "parent"),
+            ("refs/heads/feature", feat, "branch"),
+            (feat, base, "parent"),
+            ("ORIG_HEAD", main_chg, ""),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "merge aborted")
+        assert "MERGE_HEAD" not in nodes
+
+
+# ---------------------------------------------------------------------------
+# EP 07 -- Undo Without Fear: revert vs amend
+#
+# Mode: normal.  revert ADDS a new inverse commit (chain grows).  amend REPLACES
+# the last commit with a new SHA and -- uniquely -- writes NO ORIG_HEAD, so the
+# old commit is gone from the graph.
+# ---------------------------------------------------------------------------
+
+
+class TestEP07UndoFull:
+    def test_revert_adds_new_commit(self, repo: RepoTools) -> None:
+        """git revert: a new commit on top; the original commit stays. No ORIG_HEAD."""
+        repo.write("a.txt")
+        a = repo.commit("a")
+        repo.write("b.txt")
+        b = repo.commit("b")
+        repo._run(["git", "revert", "--no-edit", b])
+        rev = repo.rev_parse("HEAD")
+        assert rev != b
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", a, b, rev}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", rev, "branch"),
+            (rev, b, "parent"),
+            (b, a, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "revert")
+
+    def test_amend_replaces_last_commit_with_no_safety_net(self, repo: RepoTools) -> None:
+        """git commit --amend: a new-SHA commit replaces the old one, which VANISHES
+        (amend writes no ORIG_HEAD -- the old commit is only in the reflog)."""
+        repo.write("a.txt")
+        a = repo.commit("a")
+        repo.write("b.txt")
+        old_b = repo.commit("b")
+        repo.write("b.txt", "amended")
+        repo._run(["git", "add", "-A"])
+        repo._run(["git", "commit", "--amend", "--no-edit"])
+        amended = repo.rev_parse("HEAD")
+        assert amended != old_b
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", a, amended}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", amended, "branch"),
+            (amended, a, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "amend")
+        # The distinguishing teaching point: no safety-net ref, old commit gone.
+        assert old_b not in nodes
+        assert "ORIG_HEAD" not in nodes
+
+
+# ---------------------------------------------------------------------------
+# EP 11 -- Two Repos, One Screen: local + origin (bare)
+#
+# Mode: all.  A bare "origin" on the same machine renders as its own commit graph
+# (no index boxes).  After push it holds the pushed commit; a local-only commit
+# does not appear in origin until pushed.
+# ---------------------------------------------------------------------------
+
+
+class TestEP11TwoReposFull:
+    def test_bare_origin_holds_pushed_commits_only(self, repo: RepoTools) -> None:
+        import subprocess as sp
+
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        bare = repo.path.parent / (repo.path.name + "_origin.git")
+        sp.check_call(
+            ["git", "init", "--bare", "-b", "main", str(bare)],
+            stdout=sp.DEVNULL,
+            stderr=sp.DEVNULL,
+        )
+        repo._run(["git", "remote", "add", "origin", str(bare)])
+        repo._run(["git", "push", "-u", "origin", "main"])
+
+        # The bare origin renders as its own graph and matches the oracle exactly.
+        bnodes, _bedges, _ = full_graph(str(bare), mode="normal")
+        assert c1 in bnodes
+        assert_matches_git(str(bare), "normal")
+        assert_matches_git(str(bare), "verbose")  # bare -> trivially clean
+
+        # A local-only commit does not appear in origin until pushed.
+        repo.write("b.txt")
+        c2 = repo.commit("c2")
+        bnodes2, _b2, _ = full_graph(str(bare), mode="normal")
+        assert c1 in bnodes2
+        assert c2 not in bnodes2
+
+
+# ---------------------------------------------------------------------------
+# EP 15 -- Git's Safety Nets: pseudo-refs carry no edge label
+#
+# Mode: normal.  ORIG_HEAD (reset) and FETCH_HEAD (fetch) are real ref nodes but
+# carry NO edge label (they are not branch/tag/remote).
+# ---------------------------------------------------------------------------
+
+
+class TestEP15SafetyNetsFull:
+    def test_orig_head_and_fetch_head_have_no_edge_label(self, repo: RepoTools) -> None:
+        import subprocess as sp
+
+        repo.write("a.txt")
+        repo.commit("c1")
+        remote = repo.path.parent / (repo.path.name + "_remote.git")
+        sp.check_call(
+            ["git", "init", "--bare", "-b", "main", str(remote)],
+            stdout=sp.DEVNULL,
+            stderr=sp.DEVNULL,
+        )
+        repo._run(["git", "remote", "add", "origin", str(remote)])
+        repo._run(["git", "push", "-u", "origin", "main"])
+        repo.write("b.txt")
+        repo.commit("c2")
+        repo._run(["git", "fetch", "origin"])  # writes FETCH_HEAD
+        repo._run(["git", "reset", "--hard", "HEAD"])  # writes ORIG_HEAD
+
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        assert "ORIG_HEAD" in nodes and "FETCH_HEAD" in nodes
+        for ref in ("ORIG_HEAD", "FETCH_HEAD"):
+            ref_labels = {lbl for (frm, _to, lbl) in edges if frm == ref}
+            assert ref_labels == {""}, f"{ref} edges must carry no label, got {ref_labels}"
+
+
+# ---------------------------------------------------------------------------
+# EP 22 -- Submodules vs Subtrees
+#
+# Mode: verbose.  A subtree is NOT a distinct object: `git subtree add` merges the
+# upstream files in as ordinary blobs (no gitlink) and records the upstream
+# history as a second parent.  (Submodule/gitlink is covered above.)
+# ---------------------------------------------------------------------------
+
+
+def _has_git_subtree() -> bool:
+    import subprocess
+
+    return subprocess.run(["git", "subtree", "--help"], capture_output=True).returncode == 0
+
+
+_HAS_SUBTREE = _has_git_subtree()
+
+
+class TestEP22SubtreeFull:
+    @pytest.mark.skipif(not _HAS_SUBTREE, reason="git subtree not available")
+    def test_subtree_add_merges_normal_files_no_gitlink(self, repo: RepoTools) -> None:
+        import subprocess as sp
+
+        lib = repo.path.parent / (repo.path.name + "_lib")
+        sp.check_call(["git", "init", "-b", "main", str(lib)], stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+        for cfg in (["user.email", "l@l"], ["user.name", "L"]):
+            sp.check_call(["git", "config", *cfg], cwd=lib, stderr=sp.DEVNULL)
+        (lib / "lib.py").write_text("lib v1")
+        sp.check_call(["git", "add", "-A"], cwd=lib, stderr=sp.DEVNULL)
+        sp.check_call(["git", "commit", "-m", "lib init"], cwd=lib, stderr=sp.DEVNULL)
+
+        repo.write("main.py", "app")
+        repo.commit("app init")
+        repo._run(["git", "subtree", "add", "--prefix=vendor/lib", str(lib), "main"])
+
+        nodes, edges, _labels, _graph = build_with_labels(str(repo.path), mode="verbose")
+        # A subtree is NOT a submodule: no gitlink node anywhere.
+        assert not any(n.startswith("gitlink|") for n in nodes), "subtree must not create a gitlink"
+        # The library file is a NORMAL blob, reachable under the prefix.
+        lib_blob = repo.rev_parse("HEAD:vendor/lib/lib.py")
+        assert lib_blob in nodes
+        # The subtree-add commit is a MERGE (two parents).
+        head = repo.rev_parse("HEAD")
+        parents = repo._run(["git", "rev-list", "--parents", "-n", "1", "HEAD"]).split()[1:]
+        assert len(parents) == 2, "git subtree add creates a merge commit"
+        for p in parents:
+            assert (head, p, "parent") in edges
+        # Exhaustive correctness is enforced by the autouse oracle cross-check.
