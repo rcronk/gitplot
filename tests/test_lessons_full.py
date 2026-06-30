@@ -1392,3 +1392,142 @@ class TestEP20PackFilesFull:
         repo._run(["git", "gc", "--quiet"])
         nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
         assert_exact(nodes, edges, expected_nodes, expected_edges, "after gc")
+
+
+# ---------------------------------------------------------------------------
+# Conflict states and special object types
+#
+# In-progress merge/cherry-pick conflicts write MERGE_HEAD / CHERRY_PICK_HEAD
+# (EP04 / EP10 brief mentions); a submodule is a gitlink object (EP17's "fourth
+# object type" territory).  These exercise the pseudo-ref edge-label fix and the
+# distinct gitlink node rendering.
+# ---------------------------------------------------------------------------
+
+
+class TestConflictAndSpecialObjectsFull:
+    def test_merge_conflict_shows_merge_head(self, repo: RepoTools) -> None:
+        """An in-progress merge conflict: MERGE_HEAD -> the merged commit (no label).
+
+        git merge also writes ORIG_HEAD at the pre-merge tip even on conflict.
+        """
+        import subprocess as sp
+
+        repo.write("f.txt", "base")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("f.txt", "feature")
+        feat = repo.commit("feature change")
+        repo.checkout("main")
+        repo.write("f.txt", "main")
+        main_chg = repo.commit("main change")
+        try:
+            repo._run(["git", "merge", "feature"])
+        except sp.CalledProcessError:
+            pass  # conflict expected
+        assert (repo.path / ".git" / "MERGE_HEAD").exists()
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/heads/feature",
+            "MERGE_HEAD",
+            "ORIG_HEAD",
+            base,
+            feat,
+            main_chg,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", main_chg, "branch"),
+            (main_chg, base, "parent"),
+            ("refs/heads/feature", feat, "branch"),
+            (feat, base, "parent"),
+            ("MERGE_HEAD", feat, ""),
+            ("ORIG_HEAD", main_chg, ""),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "merge conflict")
+
+    def test_cherry_pick_conflict_shows_cherry_pick_head(self, repo: RepoTools) -> None:
+        """An in-progress cherry-pick conflict: CHERRY_PICK_HEAD -> the applied commit
+        (no label).  Cherry-pick does NOT write ORIG_HEAD."""
+        import subprocess as sp
+
+        repo.write("f.txt", "v1")
+        base = repo.commit("init")
+        repo.checkout("feature", new=True)
+        repo.write("f.txt", "feature")
+        feat = repo.commit("feature change")
+        repo.checkout("main")
+        repo.write("f.txt", "main")
+        main_div = repo.commit("main diverges")
+        try:
+            repo._run(["git", "cherry-pick", feat])
+        except sp.CalledProcessError:
+            pass  # conflict expected
+        assert (repo.path / ".git" / "CHERRY_PICK_HEAD").exists()
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/heads/feature",
+            "CHERRY_PICK_HEAD",
+            base,
+            feat,
+            main_div,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", main_div, "branch"),
+            (main_div, base, "parent"),
+            ("refs/heads/feature", feat, "branch"),
+            (feat, base, "parent"),
+            ("CHERRY_PICK_HEAD", feat, ""),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "cherry-pick conflict")
+
+    def test_submodule_gitlink_object_graph(self, repo: RepoTools) -> None:
+        """A submodule is a gitlink node (gitlink|<sha>), distinct from a blob; its
+        tree edge is labelled with the submodule directory name ('lib')."""
+        import subprocess as sp
+
+        sub = repo.path.parent / (repo.path.name + "_sub")
+        sp.check_call(["git", "init", "-b", "main", str(sub)], stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+        for cfg in (["user.email", "s@s"], ["user.name", "S"]):
+            sp.check_call(["git", "config", *cfg], cwd=sub, stderr=sp.DEVNULL)
+        (sub / "sub.txt").write_text("s")
+        sp.check_call(["git", "add", "-A"], cwd=sub, stderr=sp.DEVNULL)
+        sp.check_call(["git", "commit", "-m", "subinit"], cwd=sub, stderr=sp.DEVNULL)
+        sub_sha = sp.check_output(["git", "rev-parse", "HEAD"], cwd=sub).decode().strip()
+
+        repo.write("main.txt")
+        repo._run(["git", "add", "main.txt"])
+        repo._run(
+            ["git", "-c", "protocol.file.allow=always", "submodule", "add", sub.as_posix(), "lib"]
+        )
+        c = repo.commit("add submodule")
+        tree = repo.rev_parse(f"{c}^{{tree}}")
+        main_blob = repo.rev_parse(f"{c}:main.txt")
+        gitmodules_blob = repo.rev_parse(f"{c}:.gitmodules")
+        gitlink = f"gitlink|{sub_sha}"
+
+        nodes, edges, labels, _ = build_with_labels(str(repo.path), mode="verbose")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            c,
+            tree,
+            main_blob,
+            gitmodules_blob,
+            gitlink,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c, "branch"),
+            (c, tree, "tree"),
+            (tree, main_blob, "main.txt"),
+            (tree, gitmodules_blob, ".gitmodules"),
+            (tree, gitlink, "lib"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "submodule gitlink")
+        # The gitlink node is labelled "gitlink", distinguishing it from a blob.
+        assert labels[gitlink].startswith("gitlink"), f"gitlink label: {labels[gitlink]!r}"
