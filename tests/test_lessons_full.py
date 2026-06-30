@@ -831,6 +831,24 @@ class TestEP08RemoteTrackingFull:
         }
         assert_exact(nodes, edges, expected_nodes, expected_edges, "after fetch")
 
+    def test_origin_head_symbolic_ref_is_excluded(self, repo: RepoTools) -> None:
+        """The symbolic <remote>/HEAD pointer must NOT appear -- it only mirrors the
+        remote's default branch and would duplicate origin/main.  Some git versions
+        create refs/remotes/origin/HEAD automatically on clone/fetch (this regression
+        was caught by the oracle differential on CI)."""
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        _bare_remote(repo)
+        repo._run(["git", "remote", "set-head", "origin", "main"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/remotes/origin/main", c1}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c1, "branch"),
+            ("refs/remotes/origin/main", c1, "remote"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "origin/HEAD excluded")
+
 
 # ---------------------------------------------------------------------------
 # EP 09 -- Stash Is a Secret Commit

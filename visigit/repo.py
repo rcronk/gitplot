@@ -305,6 +305,9 @@ class GitRepo:
         if not exclude_remotes:
             try:
                 for rref in repo.remote_refs:
+                    # Skip the symbolic '<remote>/HEAD' pointer (see _collect_refs).
+                    if rref.name.endswith("/HEAD"):
+                        continue
                     try:
                         nodes.append(
                             BranchNode(
@@ -479,6 +482,12 @@ class GitRepo:
         if not exclude_remotes:
             try:
                 for rref in git.RemoteReference.list_items(repo):
+                    # Skip the symbolic '<remote>/HEAD' pointer (e.g. origin/HEAD):
+                    # it just mirrors the remote's default branch, so rendering it
+                    # is a confusing duplicate of origin/main.  Some git versions
+                    # create it automatically on clone/fetch, others do not.
+                    if rref.name.endswith("/HEAD"):
+                        continue
                     if rref.path not in seen:
                         seen.add(rref.path)
                         try:
