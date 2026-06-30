@@ -67,6 +67,7 @@ class TreeData:
     name: str  # basename; "/" for root
     parent_hexsha: str  # parent commit or tree hexsha
     child_tree_hexshas: list[str] = field(default_factory=list)
+    child_tree_entries: list[tuple[str, str]] = field(default_factory=list)  # (name, hexsha)
     blob_entries: list[tuple[str, str]] = field(default_factory=list)  # (name, hexsha)
     gitlink_entries: list[tuple[str, str]] = field(default_factory=list)  # (name, commit_hexsha)
 
@@ -146,6 +147,7 @@ class RepoGraph:
     head_branch_path: Optional[str]  # branch ref path when not detached
     is_detached: bool
     hash_length: int
+    valid: bool = True  # False only when the path is not a git repo at all
 
 
 # ---------------------------------------------------------------------------
@@ -160,10 +162,16 @@ class GitRepo:
         self.path = repo_path
         try:
             self._repo = git.Repo(repo_path)
-            self.valid = not self._repo.bare
+            # A bare repo (e.g. an "origin" on the same machine) has refs and
+            # objects but no working tree.  It is still fully renderable as a
+            # commit graph -- only the index/working-tree boxes don't apply -- so
+            # treat it as valid and remember it's bare to skip those.
+            self.valid = True
+            self.is_bare = bool(self._repo.bare)
         except (git.InvalidGitRepositoryError, git.NoSuchPathError):
             self._repo = None
             self.valid = False
+            self.is_bare = False
 
     # ------------------------------------------------------------------
     # Public API
@@ -185,6 +193,7 @@ class GitRepo:
                 head_branch_path=None,
                 is_detached=False,
                 hash_length=5,
+                valid=False,
             )
 
         repo = self._repo
@@ -227,7 +236,8 @@ class GitRepo:
 
     def get_index_state(self) -> IndexState:
         """Return staged, unstaged, and untracked file info."""
-        if not self.valid:
+        if not self.valid or self.is_bare:
+            # A bare repo has no working tree or index to report.
             return IndexState(staged=[], unstaged=[], untracked=[])
 
         repo = self._repo
@@ -303,6 +313,9 @@ class GitRepo:
         if not exclude_remotes:
             try:
                 for rref in repo.remote_refs:
+                    # Skip the symbolic '<remote>/HEAD' pointer (see _collect_refs).
+                    if rref.name.endswith("/HEAD"):
+                        continue
                     try:
                         nodes.append(
                             BranchNode(
@@ -477,6 +490,12 @@ class GitRepo:
         if not exclude_remotes:
             try:
                 for rref in git.RemoteReference.list_items(repo):
+                    # Skip the symbolic '<remote>/HEAD' pointer (e.g. origin/HEAD):
+                    # it just mirrors the remote's default branch, so rendering it
+                    # is a confusing duplicate of origin/main.  Some git versions
+                    # create it automatically on clone/fetch, others do not.
+                    if rref.name.endswith("/HEAD"):
+                        continue
                     if rref.path not in seen:
                         seen.add(rref.path)
                         try:
@@ -680,6 +699,7 @@ class GitRepo:
             name=tree.name or "/",
             parent_hexsha=parent_hexsha,
             child_tree_hexshas=[t.hexsha for t in tree.trees],
+            child_tree_entries=[(t.name, t.hexsha) for t in tree.trees],
             blob_entries=[(b.name, b.hexsha) for b in tree.blobs],
             gitlink_entries=[(s.path, s.hexsha) for s in tree if s.mode == 0o160000],
         )
