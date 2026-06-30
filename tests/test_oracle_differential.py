@@ -25,37 +25,9 @@ import pytest
 
 from . import git_oracle
 from .conftest import RepoTools
-from .test_lessons_full import assert_exact, full_graph
+from .test_lessons_full import assert_branch_invariants, assert_matches_git
 
-
-def assert_matches_git(repo_path: str, mode: str, exclude_remotes: bool = False) -> None:
-    """Opt-in helper: assert visigit's ``mode`` graph equals the git oracle's.
-
-    Eligibility: repo has >=1 commit; for verbose mode the working tree must be
-    clean (the oracle does not model the index boxes).  Any test on an eligible
-    repo can call this for an independent, belt-and-suspenders cross-check.
-    """
-    assert git_oracle.has_commit(repo_path), "oracle needs at least one commit"
-    if mode == "verbose":
-        assert git_oracle.working_tree_clean(repo_path), (
-            "verbose oracle models a clean working tree only (no index boxes)"
-        )
-    exp_nodes, exp_edges = git_oracle.expected_graph(repo_path, mode, exclude_remotes)
-    nodes, edges, _ = full_graph(repo_path, mode=mode, exclude_remotes=exclude_remotes)
-    assert_exact(nodes, edges, exp_nodes, exp_edges, f"oracle({mode}) @ {repo_path}")
-
-
-def assert_branch_invariants(repo_path: str) -> None:
-    """Independent branch-mode checks: every fork (SHA) node is a real merge-base
-    of some branch pair, and every local branch appears as a node."""
-    nodes, _edges, _ = full_graph(repo_path, mode="branch")
-    sha_nodes = {n for n in nodes if git_oracle._is_sha(n)}
-    merge_bases = git_oracle.all_merge_bases(repo_path)
-    bogus = sha_nodes - merge_bases
-    assert not bogus, f"branch-mode fork nodes that are NOT merge-bases of any branch pair: {bogus}"
-    branches = git_oracle.local_branches(repo_path)
-    missing = branches - nodes
-    assert not missing, f"local branches missing from branch-mode graph: {missing}"
+__all__ = ["assert_branch_invariants", "assert_matches_git"]
 
 
 # ---------------------------------------------------------------------------

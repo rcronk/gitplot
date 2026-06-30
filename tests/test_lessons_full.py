@@ -24,6 +24,7 @@ import pytest
 from visigit.builder import GraphBuilder
 from visigit.repo import GitRepo
 
+from . import git_oracle
 from .conftest import RepoTools
 
 # An edge is identified by (from_id, to_id, label) -- labels matter for teaching
@@ -116,6 +117,63 @@ def assert_exact(
             f"  EXTRA (drawn, not expected):\n{_fmt(extra)}"
         )
     assert not node_errs and not edge_errs, "\n".join(node_errs + edge_errs)
+
+
+# ---------------------------------------------------------------------------
+# Independent git-data oracle cross-checks (see tests/git_oracle.py)
+# ---------------------------------------------------------------------------
+
+
+def assert_matches_git(repo_path: str, mode: str, exclude_remotes: bool = False) -> None:
+    """Assert visigit's ``mode`` graph equals the independent git oracle's.
+
+    Eligibility: repo has >=1 commit; for verbose mode the working tree must be
+    clean (the oracle does not model the staged/unstaged/untracked index boxes).
+    Independent of the hand-derived expected sets, so if my hand expectation is
+    wrong in the same way visigit is wrong, this still catches it.
+    """
+    assert git_oracle.has_commit(repo_path), "oracle needs at least one commit"
+    if mode == "verbose":
+        assert git_oracle.working_tree_clean(repo_path), (
+            "verbose oracle models a clean working tree only (no index boxes)"
+        )
+    exp_nodes, exp_edges = git_oracle.expected_graph(repo_path, mode, exclude_remotes)
+    nodes, edges, _ = full_graph(repo_path, mode=mode, exclude_remotes=exclude_remotes)
+    assert_exact(nodes, edges, exp_nodes, exp_edges, f"oracle({mode}) @ {repo_path}")
+
+
+def assert_branch_invariants(repo_path: str) -> None:
+    """Independent branch-mode checks: every fork (SHA) node is a real merge-base
+    of some ref-tip pair, and every local branch appears as a node."""
+    nodes, _edges, _ = full_graph(repo_path, mode="branch")
+    sha_nodes = {n for n in nodes if git_oracle._is_sha(n)}
+    bogus = sha_nodes - git_oracle.all_merge_bases(repo_path)
+    assert not bogus, f"branch-mode fork nodes that are NOT merge-bases of any ref pair: {bogus}"
+    missing = git_oracle.local_branches(repo_path) - nodes
+    assert not missing, f"local branches missing from branch-mode graph: {missing}"
+
+
+@pytest.fixture(autouse=True)
+def _oracle_crosscheck(repo: RepoTools):
+    """After EVERY curriculum step, cross-check the final repo state against the
+    independent git oracle in all eligible modes -- so no lesson diagram can be
+    wrong (or my hand-derived expectation misleading) without a test failing.
+
+    Eligibility is guarded so intentionally-partial states (empty/unborn repos,
+    dirty trees for verbose) are skipped rather than failing.
+    """
+    yield
+    path = str(repo.path)
+    if not git_oracle.has_commit(path):
+        return  # empty/unborn repo -- oracle not applicable
+    # Normal mode works on any committed repo (clean or dirty -- no index boxes).
+    assert_matches_git(path, "normal")
+    # Verbose mode only when the working tree is clean.
+    if git_oracle.working_tree_clean(path):
+        assert_matches_git(path, "verbose")
+    # Branch mode invariants whenever there is something to fork.
+    if len(git_oracle.local_branches(path)) >= 2:
+        assert_branch_invariants(path)
 
 
 # ---------------------------------------------------------------------------
