@@ -320,3 +320,52 @@ def test_branch_invariants_for_random_repo(seed: int, tmp_path: Path) -> None:
     r = RepoTools(tmp_path)
     _random_repo(r, seed)
     assert_branch_invariants(str(r.path))
+
+
+# ---------------------------------------------------------------------------
+# Bare repositories -- e.g. an "origin" on the same machine, visualised in its
+# own monitor session alongside the working clone.  A bare repo has refs +
+# objects but no working tree, so it renders as a commit graph with no index
+# boxes.  These confirm visigit + the oracle agree on bare repos.
+# ---------------------------------------------------------------------------
+
+
+def _bare_clone_of(r: RepoTools) -> str:
+    bare = r.path.parent / (r.path.name + ".git")
+    subprocess.check_call(
+        ["git", "clone", "--bare", str(r.path), str(bare)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return str(bare)
+
+
+@pytest.mark.parametrize("name", ["linear", "branched", "no_ff_merge", "nested_dirs", "tags"])
+def test_bare_repo_matches_oracle(name: str, repo: RepoTools) -> None:
+    CLEAN_SCENARIOS[name](repo)
+    bare = _bare_clone_of(repo)
+    assert git_oracle.is_bare(bare)
+    assert_matches_git(bare, "normal")
+    assert_matches_git(bare, "verbose")  # bare has no working tree -> trivially clean
+    if len(git_oracle.local_branches(bare)) >= 2:
+        assert_branch_invariants(bare)
+
+
+def test_empty_bare_repo_shows_empty_message(tmp_path: Path) -> None:
+    """A freshly `git init --bare` origin (no commits) shows the empty-repo
+    message -- it is a valid repo, not 'No git repo found'."""
+    from visigit.repo import GitRepo
+
+    from .test_lessons_full import full_graph
+
+    bare = tmp_path / "origin.git"
+    subprocess.check_call(
+        ["git", "init", "--bare", "-b", "main", str(bare)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    gr = GitRepo(str(bare))
+    assert gr.valid and gr.is_bare
+    nodes, edges, _ = full_graph(str(bare), mode="normal")
+    assert nodes == {"empty-repo"}
+    assert edges == set()

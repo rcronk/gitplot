@@ -161,10 +161,16 @@ class GitRepo:
         self.path = repo_path
         try:
             self._repo = git.Repo(repo_path)
-            self.valid = not self._repo.bare
+            # A bare repo (e.g. an "origin" on the same machine) has refs and
+            # objects but no working tree.  It is still fully renderable as a
+            # commit graph -- only the index/working-tree boxes don't apply -- so
+            # treat it as valid and remember it's bare to skip those.
+            self.valid = True
+            self.is_bare = bool(self._repo.bare)
         except (git.InvalidGitRepositoryError, git.NoSuchPathError):
             self._repo = None
             self.valid = False
+            self.is_bare = False
 
     # ------------------------------------------------------------------
     # Public API
@@ -229,7 +235,8 @@ class GitRepo:
 
     def get_index_state(self) -> IndexState:
         """Return staged, unstaged, and untracked file info."""
-        if not self.valid:
+        if not self.valid or self.is_bare:
+            # A bare repo has no working tree or index to report.
             return IndexState(staged=[], unstaged=[], untracked=[])
 
         repo = self._repo

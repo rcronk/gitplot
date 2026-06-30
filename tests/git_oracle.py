@@ -64,8 +64,19 @@ def _git_dir(repo: str) -> Path:
     return p if p.is_absolute() else (Path(repo) / p)
 
 
+def is_bare(repo: str) -> bool:
+    rc, out = _git_ok(repo, "rev-parse", "--is-bare-repository")
+    return rc == 0 and out.strip() == "true"
+
+
 def working_tree_clean(repo: str) -> bool:
-    """True if there is nothing staged, unstaged, or untracked."""
+    """True if there is nothing staged, unstaged, or untracked.
+
+    A bare repo has no working tree, so it is trivially "clean" (and `git status`
+    would error there).
+    """
+    if is_bare(repo):
+        return True
     return _git(repo, "status", "--porcelain").strip() == ""
 
 
