@@ -190,7 +190,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 > git reset --soft vs --mixed vs --hard: Watch the Branch Pointer Move Three Different Ways
 
 #### YouTube Description
-> git reset is one of the most feared commands in git — and the most misunderstood. All three modes do the same thing to the branch pointer (move it back). What they differ on is how much of your work they preserve. Watch visigit show you exactly what disappears from the graph at each level, and you'll never confuse the three modes again.
+> git reset is one of the most feared commands in git — and the most misunderstood. All three modes do the same thing to the branch pointer (move it back), so in normal mode they produce an identical graph; what they differ on is how much of your work they preserve, which you see in verbose mode. And the commit you reset past does not vanish — ORIG_HEAD still points to it. Watch visigit show you all of this, and you'll never confuse the three modes again.
 
 #### Outline
 | Time | Section |
@@ -198,7 +198,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 0:00 | The fear: "I ran git reset and lost my work" |
 | 1:00 | Build up a chain: three commits, HEAD → main → C3 → C2 → C1 |
 | 2:00 | What all three modes share: the branch pointer moves back |
-| 3:00 | `git reset --soft HEAD~1` — C3 disappears from graph; files are staged |
+| 3:00 | `git reset --soft HEAD~1` — main moves back to C2; C3 stays visible via the ORIG_HEAD ref (git's safety net); files are staged |
 | 4:30 | Verify: `git status` shows staged changes; working tree unchanged |
 | 5:30 | `git reset --mixed HEAD~1` — pointer moves again; staged changes cleared |
 | 6:30 | Verify: `git status` shows unstaged changes; working tree still unchanged |
@@ -210,7 +210,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 #### Key Visual Moments
 - Branch pointer moving back one commit with each reset
-- Commit nodes vanishing from graph as they become unreachable
+- The reset commit staying visible via the ORIG_HEAD ref (git keeps it — it is not lost), even though main no longer points to it
 - The working tree / staging area state NOT visible in normal mode (point to verbose for that)
 - Commit node that's "gone" from graph but visible again when you detach HEAD at its SHA
 
@@ -276,7 +276,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 4:00 | Pros: preserves the true history; merge commit is explicit |
 | 5:00 | Cons: noisy graph in a large project; every integration adds a node |
 | 6:00 | Reset to diverged state; Path B: `git rebase main` from feature branch |
-| 7:30 | Watch: old feature commit nodes disappear; NEW commit nodes appear with different SHAs |
+| 7:30 | Watch: NEW commit nodes appear with different SHAs; the original feature commit stays visible via ORIG_HEAD (git keeps it — rebase does not delete it) |
 | 8:30 | The key insight: rebase does NOT move commits — it creates new ones |
 | 9:30 | Linear history: feature replay sits directly on main's tip — clean `git log` |
 | 10:30 | When to use merge: shared branches, open-source PRs, preserve context |
@@ -285,7 +285,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 #### Key Visual Moments
 - Merge: diamond with merge commit node, two parent edges
-- Rebase: old SHA nodes disappear; new SHA nodes appear in their place
+- Rebase: new SHA nodes appear; the original (pre-rebase) commit stays reachable via the ORIG_HEAD ref — git's safety net, not deleted
 - Linear history after rebase: single parent chain with no diamond
 - `git log --oneline --graph` terminal output matching the visigit diagram exactly
 
@@ -415,8 +415,8 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 |------|---------|
 | 0:00 | The disaster scenario: commits gone after reset --hard |
 | 1:00 | Build a chain: three commits on main |
-| 2:00 | `git reset --hard HEAD~2` — two commit nodes vanish from visigit |
-| 3:00 | Panic: where did they go? |
+| 2:00 | `git reset --hard HEAD~2` — main jumps back two commits; the old tip stays visible via ORIG_HEAD, but ORIG_HEAD only remembers ONE prior position |
+| 3:00 | The trap: do another operation and ORIG_HEAD is overwritten — now where did the work go? |
 | 3:30 | `git reflog` — full history of HEAD positions with SHAs |
 | 4:30 | Find the SHA of the "lost" commit in the reflog output |
 | 5:30 | `git checkout <lost-sha>` — detach HEAD at the commit; it REAPPEARS in visigit |
@@ -428,8 +428,8 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 11:30 | `git gc --prune=now` for demo: permanently remove unreachable objects |
 
 #### Key Visual Moments
-- Commit nodes disappearing from graph after `reset --hard`
-- The same nodes reappearing when HEAD is detached at their SHA
+- The pre-reset tip staying visible via ORIG_HEAD after `reset --hard`; reflog recovering commits from BEFORE that, which ORIG_HEAD no longer remembers
+- A "lost" commit reappearing when HEAD is detached at the SHA found in the reflog
 - `git branch recover <sha>` making the commits permanently reachable again
 - Before/after: the "lost" work visible in the graph once a branch ref points at it
 
@@ -460,7 +460,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 3:30 | `squash`: merge commit N into N-1 — two nodes become one, new SHA |
 | 5:00 | `fixup`: same as squash but discard the squashed commit's message |
 | 6:00 | `reword`: change a commit message — same content, new SHA because message is in the object |
-| 7:00 | `drop`: remove a commit from history — node disappears |
+| 7:00 | `drop`: remove a commit from the branch — it stays visible via ORIG_HEAD (the pre-rebase tip) until git gc |
 | 8:00 | Reorder: swap two commit lines — graph order changes, SHAs change |
 | 9:00 | After rebase: graph shows clean, linear history with new SHAs for every modified commit |
 | 10:00 | Why ALL downstream SHAs change when you modify one commit in a chain |
@@ -469,7 +469,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 #### Key Visual Moments
 - Before: messy chain of 5 commit nodes
-- During: nodes vanishing and re-appearing with new SHAs as operations apply
+- During: new-SHA nodes appearing as operations apply; the original commits staying visible via ORIG_HEAD (the pre-rebase tip)
 - After squash/fixup: fewer nodes, different SHAs
 - Every commit after the rebased point has a new SHA (child SHAs change when parent SHA changes)
 
@@ -599,8 +599,8 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 2:00 | Teammate's commit: origin/main has advanced past your last fetch |
 | 3:00 | `git push` fails: non-fast-forward rejection |
 | 3:30 | The temptation: `git push --force` |
-| 4:00 | Show what force push does: origin/main jumps back, teammate's commit is unreachable |
-| 5:00 | The teammate's commits are gone from remote — only in their local reflog |
+| 4:00 | Show what force push does: origin/main jumps to your commit; the teammate's commit is now unreachable from origin/main, though visigit still shows it via FETCH_HEAD (last fetched) |
+| 5:00 | The teammate's commits are gone from the remote ref — locally still shown via FETCH_HEAD until your next fetch, and recoverable from their reflog |
 | 6:00 | Safer alternative: `git push --force-with-lease` |
 | 7:00 | force-with-lease: push fails if origin/main has moved since your last fetch |
 | 8:00 | Legitimate uses of force push: rebased personal feature branches before PR merge |
@@ -610,7 +610,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 #### Key Visual Moments
 - Before force push: origin/main points to teammate's commit; your commit is behind
-- After force push: origin/main jumps to your commit; teammate's commit is orphaned
+- After force push: origin/main jumps to your commit; the teammate's commit is orphaned from origin/main (still visible via FETCH_HEAD until the next fetch)
 - force-with-lease rejection: no graph change because the push was blocked
 
 ---
