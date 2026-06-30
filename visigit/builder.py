@@ -75,6 +75,17 @@ class GraphBuilder:
             ):
                 self._build_index(dg, graph, index_state)
                 return dg
+            if graph.valid:
+                # Valid repo with no commits yet (unborn HEAD after git init).
+                # The branch ref and HEAD have nothing to point at, so they do not
+                # appear until the first commit -- the graph is intentionally empty.
+                self._add_node(
+                    dg,
+                    "empty-repo",
+                    label="Empty repository\n(no commits yet)",
+                    type_key="ref",
+                )
+                return dg
             self._add_node(dg, "no-repo", label="No git repo found", type_key="ref")
             return dg
 

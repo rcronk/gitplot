@@ -146,6 +146,7 @@ class RepoGraph:
     head_branch_path: Optional[str]  # branch ref path when not detached
     is_detached: bool
     hash_length: int
+    valid: bool = True  # False only when the path is not a git repo at all
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +186,7 @@ class GitRepo:
                 head_branch_path=None,
                 is_detached=False,
                 hash_length=5,
+                valid=False,
             )
 
         repo = self._repo
