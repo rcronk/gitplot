@@ -19,6 +19,8 @@ Run with:
 
 from __future__ import annotations
 
+import pytest
+
 from visigit.builder import GraphBuilder
 from visigit.repo import GitRepo
 
@@ -424,3 +426,123 @@ class TestEP04MergeFull:
         expected_nodes = {"main", "feature"}
         expected_edges = {("main", "feature", "")}
         assert_exact(nodes, edges, expected_nodes, expected_edges, "branch FF merge")
+
+
+# ---------------------------------------------------------------------------
+# EP 05 -- Reset Demystified
+#
+# Mode: normal.  Lesson beats: all three reset modes move the branch pointer back
+# by the same amount and leave the SAME graph -- the difference (index vs working
+# tree) is invisible in normal mode.  ORIG_HEAD preserves the pre-reset tip.
+# ---------------------------------------------------------------------------
+
+
+class TestEP05ResetFull:
+    @pytest.mark.parametrize("reset_mode", ["--soft", "--mixed", "--hard"])
+    def test_reset_modes_produce_identical_graph(
+        self, repo: RepoTools, reset_mode: str
+    ) -> None:
+        """reset --soft / --mixed / --hard HEAD~1 all produce the same normal-mode graph.
+
+        main moves back to c2; ORIG_HEAD keeps c3 (the pre-reset tip) reachable.
+        """
+        repo.write("a.txt")
+        c1 = repo.commit("a")
+        repo.write("b.txt")
+        c2 = repo.commit("b")
+        repo.write("c.txt")
+        c3 = repo.commit("c")
+        repo._run(["git", "reset", reset_mode, "HEAD~1"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "ORIG_HEAD", c1, c2, c3}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c2, "branch"),
+            ("ORIG_HEAD", c3, ""),
+            (c3, c2, "parent"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, f"reset {reset_mode}")
+
+
+# ---------------------------------------------------------------------------
+# EP 06 -- Detached HEAD
+#
+# Mode: normal.  Lesson beats: detached HEAD points directly at a commit (no
+# branch ref in between); a commit made while detached is an orphan that vanishes
+# once HEAD reattaches; checkout -b re-anchors the work under a branch label.
+# ---------------------------------------------------------------------------
+
+
+class TestEP06DetachedHeadFull:
+    def test_detached_head_points_directly_at_commit(self, repo: RepoTools) -> None:
+        """Detached HEAD: HEAD -> commit directly; main stays on its own tip."""
+        repo.write("a.txt")
+        c1 = repo.commit("a")
+        repo.write("b.txt")
+        c2 = repo.commit("b")
+        repo.detach(c1)
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", c1, c2}
+        expected_edges = {
+            ("HEAD", c1, "HEAD"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "detached HEAD")
+
+    def test_commit_in_detached_head_is_visible_orphan(self, repo: RepoTools) -> None:
+        """A commit made while detached is reachable from HEAD and shows in the graph."""
+        repo.write("a.txt")
+        c1 = repo.commit("a")
+        repo.write("b.txt")
+        c2 = repo.commit("b")
+        repo.detach(c1)
+        repo.write("o.txt")
+        orphan = repo.commit("orphan")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", c1, c2, orphan}
+        expected_edges = {
+            ("HEAD", orphan, "HEAD"),
+            (orphan, c1, "parent"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "detached commit")
+
+    def test_orphan_vanishes_after_reattach(self, repo: RepoTools) -> None:
+        """After reattaching to main, the detached-state orphan is unreachable and gone."""
+        repo.write("a.txt")
+        c1 = repo.commit("a")
+        repo.write("b.txt")
+        c2 = repo.commit("b")
+        repo.detach(c1)
+        repo.write("o.txt")
+        repo.commit("orphan")
+        repo.checkout("main")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", c1, c2}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "after reattach")
+
+    def test_checkout_b_recovery_reanchors_work(self, repo: RepoTools) -> None:
+        """checkout -b recovery from detached HEAD: HEAD attaches to the new branch."""
+        repo.write("a.txt")
+        c1 = repo.commit("a")
+        repo.write("b.txt")
+        c2 = repo.commit("b")
+        repo.detach(c1)
+        repo.checkout("recovery", new=True)
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/heads/recovery", c1, c2}
+        expected_edges = {
+            ("HEAD", "refs/heads/recovery", "HEAD"),
+            ("refs/heads/recovery", c1, "branch"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "recovery branch")
