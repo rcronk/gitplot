@@ -15,22 +15,27 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 02 | Beginner | Your First Repository: Watching the Graph Appear | normal | init, add, commit |
 | 03 | Beginner | Branches Aren't Copies: What Branching Really Does | normal | branch, checkout -b, switch |
 | 04 | Beginner | The Merge Diamond: Fast-Forward vs No-Fast-Forward | normal + branch | merge, merge --no-ff |
-| 05 | Beginner | Reset Demystified: Three Pointer Moves, Not Three Commands | normal | reset --soft/--mixed/--hard |
-| 06 | Beginner | Don't Panic: Detached HEAD Explained and Escaped | normal | checkout SHA, checkout -b |
-| 07 | Intermediate | Merge vs Rebase: Same Code, Completely Different History | normal | merge, rebase |
-| 08 | Intermediate | origin/main Is Not main: Remote Tracking Branches | normal | remote, fetch, pull, push |
-| 09 | Intermediate | Stash Is a Secret Commit: What git stash Actually Creates | verbose | stash, stash pop, stash list |
-| 10 | Intermediate | Cherry-Pick: Copying a Commit (and Why the SHA Changes) | normal | cherry-pick |
-| 11 | Intermediate | You Didn't Lose It: Finding Commits with git reflog | normal | reflog, reset --hard, checkout SHA |
-| 12 | Advanced | Rewrite History: Interactive Rebase, Squash, and Fixup | normal | rebase -i |
-| 13 | Advanced | Tags Are Just Pointers (Until They Aren't): Annotated vs Lightweight | normal | tag, tag -a |
-| 14 | Advanced | Binary Search Your Bug: git bisect and the Commit Graph | normal | bisect start/good/bad/reset |
-| 15 | Advanced | Two Branches, One Checkout: git worktree Explained | branch | worktree add/list/remove |
-| 16 | Advanced | Force Push Is Destroying Someone's History: Here's the Proof | normal | push --force, push --force-with-lease |
-| 17 | Internals | Inside a Commit: blob, tree, commit — Git's Four Object Types | verbose | commit (step through) |
-| 18 | Internals | Same File, Same SHA: How Git Never Stores the Same Content Twice | verbose | add, commit (cross-commit reuse) |
-| 19 | Internals | The Staging Area Exposed: What git add Actually Does to the Object Store | verbose | add, restore --staged, rm --cached |
-| 20 | Internals | All the Way Down: git cat-file, .git/objects, and Pack Files | verbose + terminal | cat-file -p/-t, ls .git/objects/ |
+| 05 | Beginner | Resolving Merge Conflicts: What MERGE_HEAD Shows You | normal | merge (conflict), add, commit, merge --abort |
+| 06 | Beginner | Reset Demystified: Three Pointer Moves, Not Three Commands | normal | reset --soft/--mixed/--hard |
+| 07 | Beginner | Undo Without Fear: revert vs amend (vs reset) | normal | revert, commit --amend |
+| 08 | Beginner | Don't Panic: Detached HEAD Explained and Escaped | normal | checkout SHA, checkout -b |
+| 09 | Intermediate | Merge vs Rebase: Same Code, Completely Different History | normal | merge, rebase |
+| 10 | Intermediate | origin/main Is Not main: Remote Tracking Branches | normal | remote, fetch, pull, push |
+| 11 | Intermediate | Two Repos, One Screen: Watching local and origin Together | all | clone, push, fetch, pull (bare origin) |
+| 12 | Intermediate | Stash Is a Secret Commit: What git stash Actually Creates | verbose | stash, stash pop, stash list |
+| 13 | Intermediate | Cherry-Pick: Copying a Commit (and Why the SHA Changes) | normal | cherry-pick |
+| 14 | Intermediate | You Didn't Lose It: Finding Commits with git reflog | normal | reflog, reset --hard, checkout SHA |
+| 15 | Intermediate | Git's Safety Nets: ORIG_HEAD, FETCH_HEAD, and Friends | normal | (observe pseudo-refs) |
+| 16 | Advanced | Rewrite History: Interactive Rebase, Squash, and Fixup | normal | rebase -i |
+| 17 | Advanced | Tags Are Just Pointers (Until They Aren't): Annotated vs Lightweight | normal | tag, tag -a |
+| 18 | Advanced | Binary Search Your Bug: git bisect and the Commit Graph | normal | bisect start/good/bad/reset |
+| 19 | Advanced | Two Branches, One Checkout: git worktree Explained | branch | worktree add/list/remove |
+| 20 | Advanced | Force Push Is Destroying Someone's History: Here's the Proof | normal | push --force, push --force-with-lease |
+| 21 | Internals | Inside a Commit: blob, tree, commit — Git's Four Object Types | verbose | commit (step through) |
+| 22 | Internals | Submodules vs Subtrees: Pointer or Merged Files? | verbose | submodule add, subtree add |
+| 23 | Internals | Same File, Same SHA: How Git Never Stores the Same Content Twice | verbose | add, commit (cross-commit reuse) |
+| 24 | Internals | The Staging Area Exposed: What git add Actually Does to the Object Store | verbose | add, restore --staged, rm --cached |
+| 25 | Internals | All the Way Down: git cat-file, .git/objects, and Pack Files | verbose + terminal | cat-file -p/-t, ls .git/objects/ |
 
 ---
 
@@ -55,7 +60,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 |------|---------|
 | 0:00 | Hook: show monitor mode updating live as git commands run |
 | 0:45 | What visigit is and why it exists |
-| 1:30 | Prerequisites: git, Python 3.9+, graphviz (`apt install graphviz`) |
+| 1:30 | Prerequisites: git (2.28+ required for `git init -b`; record on the latest stable git and state the version on-screen), Python 3.9+, graphviz (`apt install graphviz`) |
 | 2:30 | Install visigit (`pip install -e .` or from source) |
 | 3:30 | Quick demo: `visigit` on an existing repo — three modes at a glance |
 | 4:30 | Set up the two-terminal workflow: visigit in Terminal A, git in Terminal B |
@@ -180,7 +185,42 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 05 — Beginner — Reset Demystified: Three Pointer Moves, Not Three Commands
+### EP 05 — Beginner — Resolving Merge Conflicts: What MERGE_HEAD Shows You
+
+**visigit mode:** normal  
+**Target length:** 10–12 min  
+**Commands covered:** git merge (conflict), git status, git add, git commit, git merge --abort
+
+#### YouTube Title
+> Merge Conflicts Aren't Scary: git Writes MERGE_HEAD and visigit Shows You Exactly Where You Are
+
+#### YouTube Description
+> A merge conflict stops git mid-merge and leaves you in a state most people find terrifying. It shouldn't be. When a merge conflicts, git writes a ref called MERGE_HEAD pointing at the commit you're merging in — and visigit shows it right in the graph, so you can always see both sides of the merge and exactly what you're resolving. This video walks a conflict from start to finish: what MERGE_HEAD is, how to resolve it, and how to bail out with --abort.
+
+#### Outline
+| Time | Section |
+|------|---------|
+| 0:00 | The fear: "CONFLICT (content): Merge conflict in ..." |
+| 1:00 | Set up two branches that edit the same line |
+| 2:00 | `git merge feature` — it stops; the working tree is now mid-merge |
+| 2:45 | visigit shows MERGE_HEAD pointing at the feature commit — both sides visible |
+| 3:45 | `git status` — "Unmerged paths"; what the index looks like during a conflict |
+| 4:45 | Open the file: the `<<<<<<<`, `=======`, `>>>>>>>` markers explained |
+| 5:45 | Resolve, then `git add` the file — the conflict is staged |
+| 6:45 | `git commit` — the merge commit appears with TWO parents; MERGE_HEAD disappears |
+| 7:45 | The escape hatch: `git merge --abort` — back to before the merge, MERGE_HEAD gone |
+| 8:45 | Why MERGE_HEAD matters: it's how git (and you) remember what's being merged |
+| 10:00 | Recap: a conflict is just a paused merge; MERGE_HEAD marks the other side |
+
+#### Key Visual Moments
+- MERGE_HEAD node appearing the moment a merge conflicts, pointing at the merged commit
+- Both merge parents visible simultaneously while the conflict is unresolved
+- The merge commit forming (two parent edges) and MERGE_HEAD vanishing on `git commit`
+- `git merge --abort` removing MERGE_HEAD and returning HEAD to the pre-merge tip
+
+---
+
+### EP 06 — Beginner — Reset Demystified: Three Pointer Moves, Not Three Commands
 
 **visigit mode:** normal  
 **Target length:** 12–14 min  
@@ -206,7 +246,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 8:30 | Verify: `git status` is clean; the files are gone |
 | 9:30 | The unreachable commit: it still exists in `.git/objects` — show in verbose mode |
 | 10:30 | When to use each: fixing the last commit vs recovering from disaster |
-| 12:00 | Teaser: Episode 11 shows you how to recover from --hard with reflog |
+| 12:00 | Teaser: Episode 14 shows you how to recover from --hard with reflog |
 
 #### Key Visual Moments
 - Branch pointer moving back one commit with each reset
@@ -216,7 +256,43 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 06 — Beginner — Don't Panic: Detached HEAD Explained and Escaped
+### EP 07 — Beginner — Undo Without Fear: revert vs amend (vs reset)
+
+**visigit mode:** normal  
+**Target length:** 11–13 min  
+**Commands covered:** git revert, git commit --amend, (contrast with git reset)
+
+#### YouTube Title
+> git revert vs git commit --amend vs git reset: Three Ways to Undo, Three Different Graphs
+
+#### YouTube Description
+> "Undo" in git isn't one thing. revert ADDS a new commit that cancels an old one (safe to share). amend REWRITES your last commit (new SHA, the old one orphaned). reset MOVES the branch pointer back. They look similar in the terminal but do completely different things to the graph — and visigit makes the difference impossible to miss. By the end you'll always pick the right one.
+
+#### Outline
+| Time | Section |
+|------|---------|
+| 0:00 | Three "undos" that are nothing alike |
+| 1:00 | Build a small history: a couple of commits |
+| 2:00 | `git revert HEAD` — a NEW commit appears on top; the chain GROWS |
+| 3:00 | Why revert is safe on shared branches: it doesn't rewrite anything |
+| 4:00 | Contrast: `git reset` moves the pointer back (the EP06 mechanic) |
+| 5:00 | `git commit --amend` — fix the last commit's message or content |
+| 5:45 | Watch: the old commit VANISHES; a new SHA replaces it |
+| 6:30 | The catch: amend writes NO ORIG_HEAD — the old commit is only in the reflog |
+| 7:30 | Why the SHA changes: the message and content are part of the commit object |
+| 8:30 | When to use each: revert (shared), amend (last local commit), reset (move the tip) |
+| 9:30 | The golden rule: never amend or reset commits you've already pushed and shared |
+| 11:00 | Recap: revert ADDS, amend REPLACES, reset MOVES |
+
+#### Key Visual Moments
+- revert: a new commit node appended (graph grows by one), the original commit untouched
+- amend: the old commit node disappearing and a new-SHA node taking its place
+- The absence of ORIG_HEAD after amend (unlike reset/rebase) — its old commit is truly gone from the graph
+- Side-by-side mental model: ADD (revert) vs REPLACE (amend) vs MOVE (reset)
+
+---
+
+### EP 08 — Beginner — Don't Panic: Detached HEAD Explained and Escaped
 
 **visigit mode:** normal  
 **Target length:** 10–12 min  
@@ -255,7 +331,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 07 — Intermediate — Merge vs Rebase: Same Code, Completely Different History
+### EP 09 — Intermediate — Merge vs Rebase: Same Code, Completely Different History
 
 **visigit mode:** normal  
 **Target length:** 13–15 min  
@@ -291,7 +367,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 08 — Intermediate — origin/main Is Not main: Remote Tracking Branches
+### EP 10 — Intermediate — origin/main Is Not main: Remote Tracking Branches
 
 **visigit mode:** normal  
 **Target length:** 12–14 min  
@@ -326,7 +402,42 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 09 — Intermediate — Stash Is a Secret Commit: What git stash Actually Creates
+### EP 11 — Intermediate — Two Repos, One Screen: Watching local and origin Together
+
+**visigit mode:** all (two monitor sessions)  
+**Target length:** 11–13 min  
+**Commands covered:** git clone, git push, git fetch, git pull (with a bare "origin" on the same machine)
+
+#### YouTube Title
+> See Both Sides of git push/fetch: Visualize Your Repo AND origin Side by Side
+
+#### YouTube Description
+> origin/main is a snapshot inside your repo — but where's the ACTUAL origin? In this video we put a bare "origin" repository on the same machine and run a second `visigit --monitor` on it, so you watch BOTH graphs at once. Now push, fetch, and pull aren't mysterious: you see commits leave your repo and land in origin, and origin/main catch up — live, side by side.
+
+#### Outline
+| Time | Section |
+|------|---------|
+| 0:00 | The missing half: you've seen origin/main, but never origin itself |
+| 1:00 | Make a bare origin: `git init --bare ../origin.git` (no working tree) |
+| 2:00 | Terminal layout: `visigit --monitor` on your repo (left), on the bare origin (right) |
+| 3:00 | `git push` — watch the commit appear in the origin graph; origin/main advances |
+| 4:30 | Teammate simulation: commit in a second clone and push to origin |
+| 5:30 | `git fetch` — origin/main moves in YOUR graph to match the origin graph |
+| 6:30 | `git pull` (fetch + merge) — local main catches up; both graphs converge |
+| 7:30 | A bare repo has no working tree: no Staged/Unstaged boxes, just the commit graph |
+| 8:30 | Diverged: local and origin each advance — see it on both screens at once |
+| 9:30 | Why bare: pushing to a non-bare repo's checked-out branch is rejected by default |
+| 11:00 | Recap: push/fetch/pull are just commits moving between two real graphs |
+
+#### Key Visual Moments
+- Two visigit windows: your repo and the bare origin, updating independently
+- A commit appearing in the origin graph the instant you push
+- origin/main in your graph jumping to match origin after fetch
+- The bare origin rendering as a pure commit graph (no index boxes — it has no working tree)
+
+---
+
+### EP 12 — Intermediate — Stash Is a Secret Commit: What git stash Actually Creates
 
 **visigit mode:** verbose  
 **Target length:** 10–12 min  
@@ -362,7 +473,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 10 — Intermediate — Cherry-Pick: Copying a Commit (and Why the SHA Changes)
+### EP 13 — Intermediate — Cherry-Pick: Copying a Commit (and Why the SHA Changes)
 
 **visigit mode:** normal  
 **Target length:** 10–12 min  
@@ -398,7 +509,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 11 — Intermediate — You Didn't Lose It: Finding Commits with git reflog
+### EP 14 — Intermediate — You Didn't Lose It: Finding Commits with git reflog
 
 **visigit mode:** normal  
 **Target length:** 12–14 min  
@@ -435,11 +546,46 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
+### EP 15 — Intermediate — Git's Safety Nets: ORIG_HEAD, FETCH_HEAD, and Friends
+
+**visigit mode:** normal  
+**Target length:** 10–12 min  
+**Commands covered:** observing ORIG_HEAD, FETCH_HEAD, MERGE_HEAD, CHERRY_PICK_HEAD, BISECT_HEAD
+
+#### YouTube Title
+> The Hidden Refs That Save You: ORIG_HEAD, FETCH_HEAD, and git's Other Safety Nets
+
+#### YouTube Description
+> You've seen them flash by: ORIG_HEAD after a reset, MERGE_HEAD during a conflict, FETCH_HEAD after a fetch. These are git's pointer files — special refs git writes so YOU (and git) can recover and reason about what just happened. Most tools hide them; visigit shows them. This video gathers them in one place so you understand the safety net under every "dangerous" command.
+
+#### Outline
+| Time | Section |
+|------|---------|
+| 0:00 | The refs you keep seeing but nobody explains |
+| 1:00 | ORIG_HEAD: written by reset, rebase, and merge — the "where I was" pointer |
+| 2:30 | Recover from `git reset --hard` using ORIG_HEAD, live |
+| 3:30 | MERGE_HEAD: the other side of an in-progress merge (callback to EP05) |
+| 4:30 | CHERRY_PICK_HEAD: the commit being applied during a cherry-pick conflict |
+| 5:30 | FETCH_HEAD: what `git fetch` just brought down |
+| 6:30 | BISECT_HEAD: where a bisect session is currently testing (callback to EP18) |
+| 7:30 | The one exception: `git commit --amend` writes NO ORIG_HEAD (callback to EP07) |
+| 8:30 | Why visigit shows these: they ARE refs — real pointers into the object store |
+| 9:30 | The mental model: almost nothing is ever truly lost until git gc |
+| 11:00 | Recap: every scary command leaves a breadcrumb — now you can see them |
+
+#### Key Visual Moments
+- ORIG_HEAD appearing after reset/rebase/merge, keeping the "old" tip reachable
+- MERGE_HEAD / CHERRY_PICK_HEAD appearing only mid-operation, then vanishing on completion
+- FETCH_HEAD and BISECT_HEAD shown as ordinary ref nodes with no edge label
+- The contrast: amend leaves no safety net, so its old commit really is gone from the graph
+
+---
+
 ## Tier 3 — Advanced: Power User Git
 
 ---
 
-### EP 12 — Advanced — Rewrite History: Interactive Rebase, Squash, and Fixup
+### EP 16 — Advanced — Rewrite History: Interactive Rebase, Squash, and Fixup
 
 **visigit mode:** normal  
 **Target length:** 13–15 min  
@@ -465,7 +611,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 | 9:00 | After rebase: graph shows clean, linear history with new SHAs for every modified commit |
 | 10:00 | Why ALL downstream SHAs change when you modify one commit in a chain |
 | 11:30 | The golden rule: never rebase commits already pushed to a shared branch |
-| 13:00 | `git push --force-with-lease` if you must — covered more in EP 16 |
+| 13:00 | `git push --force-with-lease` if you must — covered more in EP 20 |
 
 #### Key Visual Moments
 - Before: messy chain of 5 commit nodes
@@ -475,7 +621,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 13 — Advanced — Tags Are Just Pointers (Until They Aren't): Annotated vs Lightweight
+### EP 17 — Advanced — Tags Are Just Pointers (Until They Aren't): Annotated vs Lightweight
 
 **visigit mode:** normal  
 **Target length:** 10–12 min  
@@ -509,7 +655,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 14 — Advanced — Binary Search Your Bug: git bisect and the Commit Graph
+### EP 18 — Advanced — Binary Search Your Bug: git bisect and the Commit Graph
 
 **visigit mode:** normal  
 **Target length:** 11–13 min  
@@ -545,7 +691,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 15 — Advanced — Two Branches, One Checkout: git worktree Explained
+### EP 19 — Advanced — Two Branches, One Checkout: git worktree Explained
 
 **visigit mode:** branch  
 **Target length:** 10–12 min  
@@ -579,7 +725,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 16 — Advanced — Force Push Is Destroying Someone's History: Here's the Proof
+### EP 20 — Advanced — Force Push Is Destroying Someone's History: Here's the Proof
 
 **visigit mode:** normal  
 **Target length:** 11–13 min  
@@ -619,7 +765,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 17 — Internals — Inside a Commit: blob, tree, commit — Git's Four Object Types
+### EP 21 — Internals — Inside a Commit: blob, tree, commit — Git's Four Object Types
 
 **visigit mode:** verbose  
 **Target length:** 13–15 min  
@@ -656,7 +802,43 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 18 — Internals — Same File, Same SHA: How Git Never Stores the Same Content Twice
+### EP 22 — Internals — Submodules vs Subtrees: Pointer or Merged Files?
+
+**visigit mode:** verbose  
+**Target length:** 12–14 min  
+**Commands covered:** git submodule add, git subtree add
+
+#### YouTube Title
+> Submodules vs Subtrees: One Stores a Pointer, the Other Merges the Files — See the Difference
+
+#### YouTube Description
+> Two ways to include one repo inside another, and they couldn't be more different under the hood. A submodule stores a gitlink — a pointer to a specific commit in another repo — which visigit shows as a distinct node. A subtree merges the other repo's files directly into your tree as ordinary blobs, with its history as a second parent. This video opens both in verbose mode so you can see exactly what git stores in each case.
+
+#### Outline
+| Time | Section |
+|------|---------|
+| 0:00 | Same goal, opposite mechanics |
+| 1:00 | `git submodule add ../lib lib` — what actually lands in your tree? |
+| 2:00 | Verbose graph: a gitlink node (mode 160000) pointing at the submodule's commit |
+| 3:00 | The .gitmodules file is a real blob; the submodule itself is just a pointer |
+| 4:00 | Key point: your repo does NOT contain the submodule's files — only its SHA |
+| 5:30 | Reset and try the other way: `git subtree add --prefix=vendor/lib ../lib main` |
+| 6:30 | Verbose graph: the library's files appear as NORMAL blobs under vendor/lib |
+| 7:30 | The subtree add is a MERGE commit — the library's history is a second parent |
+| 8:30 | Content-addressable bonus: the imported tree is deduplicated in the graph |
+| 9:30 | Trade-offs: submodule (light pointer, needs `submodule update`) vs subtree (self-contained) |
+| 11:00 | Why visigit renders a gitlink distinctly but a subtree as plain objects |
+| 13:00 | Recap: submodule = a SHA pointer node; subtree = the actual files + a merge |
+
+#### Key Visual Moments
+- Submodule: a distinct `gitlink` node pointing at another repo's commit, beside the .gitmodules blob
+- Subtree: the imported files as ordinary blobs/trees under the prefix directory
+- The subtree-add merge commit with two parents (your history + the imported history)
+- Tree deduplication: the imported subtree sharing a tree node with the vendored copy
+
+---
+
+### EP 23 — Internals — Same File, Same SHA: How Git Never Stores the Same Content Twice
 
 **visigit mode:** verbose  
 **Target length:** 11–13 min  
@@ -691,7 +873,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 19 — Internals — The Staging Area Exposed: What git add Actually Does to the Object Store
+### EP 24 — Internals — The Staging Area Exposed: What git add Actually Does to the Object Store
 
 **visigit mode:** verbose  
 **Target length:** 12–14 min  
@@ -728,7 +910,7 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ---
 
-### EP 20 — Internals — All the Way Down: git cat-file, .git/objects, and Pack Files
+### EP 25 — Internals — All the Way Down: git cat-file, .git/objects, and Pack Files
 
 **visigit mode:** verbose + terminal (git cat-file)  
 **Target length:** 14–16 min  
@@ -768,15 +950,24 @@ The diagram updates live. Viewers watch the DAG change rather than guessing what
 
 ## Integration Test Notes
 
-A companion test suite lives at [tests/test_lessons.py](../tests/test_lessons.py).
-Each test class corresponds to a lesson and verifies that visigit produces the correct
-DOT structure for the git state described in that episode.
+Three companion test layers keep every lesson diagram accurate:
 
-Running the suite:
+- [tests/test_lessons.py](../tests/test_lessons.py) — **key** node/edge presence per episode
+  (survives cosmetic layout changes).
+- [tests/test_lessons_full.py](../tests/test_lessons_full.py) — **exhaustive** per-step checks:
+  the exact, complete node + edge + label set for each lesson state, hand-derived from git
+  semantics. An autouse fixture also cross-checks every step against the independent oracle.
+- [tests/git_oracle.py](../tests/git_oracle.py) + [tests/test_oracle_differential.py](../tests/test_oracle_differential.py)
+  — an **independent** oracle that re-derives the expected graph straight from `git` plumbing
+  (a different algorithm) and is compared against visigit over fixed scenarios and randomly
+  generated repos, in normal / verbose / branch modes (including bare "origin" repos).
+
+Running them:
 ```bash
-pytest tests/test_lessons.py -v
+pytest tests/test_lessons.py tests/test_lessons_full.py tests/test_oracle_differential.py -v
 ```
 
-Tests are structural (node/edge presence in DOT source), not golden-file comparisons,
-so they survive cosmetic layout changes. When a test fails it likely means a visigit bug
-would cause the diagram in that lesson to be wrong.
+When a test fails it almost always means a visigit bug would make the diagram in that lesson
+wrong. Git behaviour varies across versions (e.g. auto-creating `refs/remotes/origin/HEAD`),
+so the CI matrix runs the suite on multiple OS and Python versions; record lessons on a recent
+stable git and state the version on-screen.
