@@ -439,9 +439,7 @@ class TestEP04MergeFull:
 
 class TestEP05ResetFull:
     @pytest.mark.parametrize("reset_mode", ["--soft", "--mixed", "--hard"])
-    def test_reset_modes_produce_identical_graph(
-        self, repo: RepoTools, reset_mode: str
-    ) -> None:
+    def test_reset_modes_produce_identical_graph(self, repo: RepoTools, reset_mode: str) -> None:
         """reset --soft / --mixed / --hard HEAD~1 all produce the same normal-mode graph.
 
         main moves back to c2; ORIG_HEAD keeps c3 (the pre-reset tip) reachable.
@@ -546,3 +544,200 @@ class TestEP06DetachedHeadFull:
             (c2, c1, "parent"),
         }
         assert_exact(nodes, edges, expected_nodes, expected_edges, "recovery branch")
+
+
+# ---------------------------------------------------------------------------
+# EP 07 -- Merge vs Rebase
+#
+# Mode: normal.  Lesson beats: merge makes a diamond (merge commit, two parents);
+# rebase replays feature onto main's tip as a NEW commit (new SHA), producing a
+# linear chain.  ORIG_HEAD preserves the pre-rebase feature tip (git's safety net).
+# ---------------------------------------------------------------------------
+
+
+class TestEP07MergeVsRebaseFull:
+    def _diverged(self, repo: RepoTools) -> tuple[str, str, str]:
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("feat.txt")
+        cf = repo.commit("feat")
+        repo.checkout("main")
+        repo.write("fix.txt")
+        ch = repo.commit("hotfix")
+        return base, cf, ch
+
+    def test_merge_path_diamond(self, repo: RepoTools) -> None:
+        """Path A -- merge --no-ff: the merge commit with two parents (the diamond)."""
+        base, cf, ch = self._diverged(repo)
+        repo.merge("feature", no_ff=True)
+        cm = repo.rev_parse("HEAD")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/heads/feature",
+            "ORIG_HEAD",
+            base,
+            cf,
+            ch,
+            cm,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", cm, "branch"),
+            (cm, ch, "parent"),
+            (cm, cf, "parent"),
+            (ch, base, "parent"),
+            (cf, base, "parent"),
+            ("refs/heads/feature", cf, "branch"),
+            ("ORIG_HEAD", ch, ""),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "EP07 merge path")
+
+    def test_rebase_path_linear_new_sha(self, repo: RepoTools) -> None:
+        """Path B -- rebase: feature is replayed onto ch as a new commit cf_new.
+
+        Linear chain feature -> cf_new -> ch -> base, main -> ch.  The old feature
+        tip cf_old stays reachable via ORIG_HEAD (git keeps it -- it is NOT deleted).
+        """
+        base, cf_old, ch = self._diverged(repo)
+        repo.checkout("feature")
+        repo._run(["git", "rebase", "main"])
+        cf_new = repo.rev_parse("HEAD")
+        assert cf_new != cf_old
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/feature",
+            "refs/heads/main",
+            "ORIG_HEAD",
+            base,
+            ch,
+            cf_old,
+            cf_new,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/feature", "HEAD"),
+            ("refs/heads/feature", cf_new, "branch"),
+            (cf_new, ch, "parent"),
+            ("refs/heads/main", ch, "branch"),
+            (ch, base, "parent"),
+            ("ORIG_HEAD", cf_old, ""),
+            (cf_old, base, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "EP07 rebase path")
+
+
+# ---------------------------------------------------------------------------
+# EP 08 -- origin/main Is Not main: Remote Tracking Branches
+#
+# Mode: normal.  Lesson beats: pushing creates refs/remotes/origin/main; a local
+# commit makes local main and origin/main diverge; fetch advances origin/main (and
+# writes FETCH_HEAD) while local main trails; --exclude-remotes hides remote refs.
+# ---------------------------------------------------------------------------
+
+
+def _bare_remote(repo: RepoTools) -> str:
+    remote_path = repo.path.parent / (repo.path.name + "_remote.git")
+    import subprocess as sp
+
+    sp.check_call(
+        ["git", "init", "--bare", "-b", "main", str(remote_path)],
+        stdout=sp.DEVNULL,
+        stderr=sp.DEVNULL,
+    )
+    repo._run(["git", "remote", "add", "origin", str(remote_path)])
+    repo._run(["git", "push", "-u", "origin", "main"])
+    return str(remote_path)
+
+
+class TestEP08RemoteTrackingFull:
+    def test_after_push_remote_ref_appears(self, repo: RepoTools) -> None:
+        """After push: local main and origin/main both point at the single commit."""
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        _bare_remote(repo)
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/remotes/origin/main", c1}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c1, "branch"),
+            ("refs/remotes/origin/main", c1, "remote"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "after push")
+
+    def test_local_commit_diverges_from_origin(self, repo: RepoTools) -> None:
+        """A local commit past the last push: main advances; origin/main stays behind."""
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        _bare_remote(repo)
+        repo.write("b.txt")
+        c2 = repo.commit("c2")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/remotes/origin/main", c1, c2}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+            ("refs/remotes/origin/main", c1, "remote"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "local diverge")
+
+    def test_exclude_remotes_hides_origin(self, repo: RepoTools) -> None:
+        """--exclude-remotes drops refs/remotes/* but keeps local refs and commits."""
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        _bare_remote(repo)
+        repo.write("b.txt")
+        c2 = repo.commit("c2")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal", exclude_remotes=True)
+        expected_nodes = {"HEAD", "refs/heads/main", c1, c2}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "exclude remotes")
+
+    def test_after_fetch_origin_ahead(self, repo: RepoTools) -> None:
+        """After fetch: origin/main advances to the remote tip (and FETCH_HEAD points
+        there too); local main trails.  FETCH_HEAD's edge carries no label."""
+        import subprocess as sp
+
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        remote_path = _bare_remote(repo)
+        clone = repo.path.parent / (repo.path.name + "_clone")
+        sp.check_call(
+            ["git", "clone", "--branch", "main", remote_path, str(clone)],
+            stdout=sp.DEVNULL,
+            stderr=sp.DEVNULL,
+        )
+        for cfg in (["user.email", "t@t"], ["user.name", "T"]):
+            sp.check_call(["git", "config", *cfg], cwd=clone, stderr=sp.DEVNULL)
+        (clone / "x.txt").write_text("x")
+        sp.check_call(["git", "add", "-A"], cwd=clone, stderr=sp.DEVNULL)
+        sp.check_call(["git", "commit", "-m", "remote2"], cwd=clone, stderr=sp.DEVNULL)
+        sp.check_call(
+            ["git", "push", "origin", "main"], cwd=clone, stdout=sp.DEVNULL, stderr=sp.DEVNULL
+        )
+        cr = sp.check_output(["git", "rev-parse", "HEAD"], cwd=clone).decode().strip()
+        repo._run(["git", "fetch", "origin"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/remotes/origin/main",
+            "FETCH_HEAD",
+            c1,
+            cr,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c1, "branch"),
+            ("refs/remotes/origin/main", cr, "remote"),
+            ("FETCH_HEAD", cr, ""),
+            (cr, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "after fetch")
