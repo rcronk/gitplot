@@ -31,6 +31,43 @@ from .conftest import RepoTools
 Edge = tuple[str, str, str]
 
 
+class _CapturingBuilder(GraphBuilder):
+    """GraphBuilder that records each node's label as it is added.
+
+    Lets tests verify node labels (e.g. the worktree '[wt: ...]' annotation, or
+    that a commit SHA node is labelled 'commit' and not 'blob') without parsing
+    DOT source.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.labels: dict[str, str] = {}
+
+    def _add_node(self, dg, node_id: str, label: str, type_key: str) -> None:
+        if node_id not in self._rendered_nodes:
+            self.labels[node_id] = label
+        super()._add_node(dg, node_id, label=label, type_key=type_key)
+
+
+def build_with_labels(
+    repo_path: str,
+    mode: str = "normal",
+    exclude_remotes: bool = False,
+    **kwargs,
+) -> tuple[set[str], set[Edge], dict[str, str], object]:
+    """Build the diagram and return (nodes, edges, labels, RepoGraph)."""
+    git_repo = GitRepo(repo_path)
+    include_trees = mode == "verbose"
+    graph = git_repo.build_graph(include_trees=include_trees, exclude_remotes=exclude_remotes)
+    index_state = git_repo.get_index_state() if mode == "verbose" else None
+    branch_topo = git_repo.get_branch_topology() if mode == "branch" else None
+    builder = _CapturingBuilder(mode=mode, **kwargs)
+    builder.build(graph, index_state=index_state, branch_topology=branch_topo)
+    nodes = set(builder.node_ids)
+    edges = set(builder._rendered_edges)
+    return nodes, edges, builder.labels, graph
+
+
 def full_graph(
     repo_path: str,
     mode: str = "normal",
@@ -42,15 +79,9 @@ def full_graph(
     nodes -- the complete set of node IDs the builder emitted.
     edges -- the complete set of (from, to, label) triples the builder emitted.
     """
-    git_repo = GitRepo(repo_path)
-    include_trees = mode == "verbose"
-    graph = git_repo.build_graph(include_trees=include_trees, exclude_remotes=exclude_remotes)
-    index_state = git_repo.get_index_state() if mode == "verbose" else None
-    branch_topo = git_repo.get_branch_topology() if mode == "branch" else None
-    builder = GraphBuilder(mode=mode, **kwargs)
-    builder.build(graph, index_state=index_state, branch_topology=branch_topo)
-    nodes = set(builder.node_ids)
-    edges = set(builder._rendered_edges)
+    nodes, edges, _labels, graph = build_with_labels(
+        repo_path, mode=mode, exclude_remotes=exclude_remotes, **kwargs
+    )
     return nodes, edges, graph
 
 
@@ -889,3 +920,475 @@ class TestEP17ObjectModelFull:
             (util_tree, helper, "helper.py"),
         }
         assert_exact(nodes, edges, expected_nodes, expected_edges, "nested subdirs")
+
+
+# ---------------------------------------------------------------------------
+# EP 10 -- Cherry-Pick
+#
+# Mode: normal.  Lesson beats: cherry-pick copies a commit's changes onto another
+# branch as a NEW commit with a different SHA (different parent); the original
+# commit stays on its branch.
+# ---------------------------------------------------------------------------
+
+
+class TestEP10CherryPickFull:
+    def test_cherry_pick_creates_new_commit(self, repo: RepoTools) -> None:
+        """The picked commit has a new SHA whose parent is main's tip; gem stays on feature."""
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.checkout("feature", new=True)
+        repo.write("gem.txt", "gem")
+        gem = repo.commit("gem")
+        repo.checkout("main")
+        repo.write("mw.txt")
+        mw = repo.commit("main work")
+        repo._run(["git", "cherry-pick", gem])
+        pick = repo.rev_parse("HEAD")
+        assert pick != gem
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/heads/feature", base, gem, mw, pick}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", pick, "branch"),
+            (pick, mw, "parent"),
+            (mw, base, "parent"),
+            ("refs/heads/feature", gem, "branch"),
+            (gem, base, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "cherry-pick")
+
+
+# ---------------------------------------------------------------------------
+# EP 11 -- You Didn't Lose It: git reflog
+#
+# Mode: normal.  Lesson beats: after reset --hard the commits are "lost" from the
+# branch, but ORIG_HEAD (git's safety net) keeps the pre-reset tip reachable, and
+# a new branch at that SHA makes the work permanent.
+# ---------------------------------------------------------------------------
+
+
+class TestEP11ReflogFull:
+    def test_reset_hard_two_back_orig_head_preserves_chain(self, repo: RepoTools) -> None:
+        """reset --hard HEAD~2: main moves to c1; ORIG_HEAD keeps c3 (and c2) visible."""
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        repo.write("b.txt")
+        c2 = repo.commit("c2")
+        repo.write("c.txt")
+        c3 = repo.commit("c3")
+        repo._run(["git", "reset", "--hard", "HEAD~2"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "ORIG_HEAD", c1, c2, c3}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c1, "branch"),
+            ("ORIG_HEAD", c3, ""),
+            (c3, c2, "parent"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "reset --hard ~2")
+
+    def test_branch_recover_makes_lost_work_permanent(self, repo: RepoTools) -> None:
+        """git branch recover <lost-sha>: a real ref now points at the recovered tip."""
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        repo.write("b.txt")
+        c2 = repo.commit("c2")
+        repo.write("c.txt")
+        c3 = repo.commit("c3")
+        repo._run(["git", "reset", "--hard", "HEAD~2"])
+        repo._run(["git", "branch", "recover", c3])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/heads/recover", "ORIG_HEAD", c1, c2, c3}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c1, "branch"),
+            ("refs/heads/recover", c3, "branch"),
+            ("ORIG_HEAD", c3, ""),
+            (c3, c2, "parent"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "branch recover")
+
+
+# ---------------------------------------------------------------------------
+# EP 12 -- Rewrite History: Interactive Rebase, Squash, Fixup
+#
+# Mode: normal.  Squash and drop are simulated with reset (+commit), which gives
+# the SAME graph topology as `git rebase -i`: a new/!moved tip, the discarded
+# commits unreachable from the branch but preserved via ORIG_HEAD.
+# ---------------------------------------------------------------------------
+
+
+class TestEP12InteractiveRebaseFull:
+    def test_squash_collapses_two_into_one(self, repo: RepoTools) -> None:
+        """Squash A+B into one commit on base; ORIG_HEAD keeps the old A->B chain."""
+        repo.write("base.txt")
+        base = repo.commit("base")
+        repo.write("a.txt")
+        a = repo.commit("A")
+        repo.write("b.txt")
+        b = repo.commit("B")
+        repo._run(["git", "reset", "--soft", base])
+        squash = repo.commit("squashed A+B")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "ORIG_HEAD", base, a, b, squash}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", squash, "branch"),
+            (squash, base, "parent"),
+            ("ORIG_HEAD", b, ""),
+            (b, a, "parent"),
+            (a, base, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "squash")
+
+    def test_drop_removes_commit_from_branch(self, repo: RepoTools) -> None:
+        """Drop B: main returns to A; ORIG_HEAD keeps the dropped commit visible."""
+        repo.write("a.txt")
+        a = repo.commit("A")
+        repo.write("b.txt")
+        b = repo.commit("B to drop")
+        repo._run(["git", "reset", "--hard", a])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "ORIG_HEAD", a, b}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", a, "branch"),
+            ("ORIG_HEAD", b, ""),
+            (b, a, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "drop")
+
+
+# ---------------------------------------------------------------------------
+# EP 13 -- Tags Are Just Pointers (Until They Aren't)
+#
+# Mode: normal.  Lightweight tag: ref -> commit (one hop).  Annotated tag:
+# ref -> tag object -> commit (two hops); the tag object has its own SHA.
+# ---------------------------------------------------------------------------
+
+
+class TestEP13TagsFull:
+    def test_lightweight_and_annotated_tags(self, repo: RepoTools) -> None:
+        """Both tag shapes at once: v1.0 one hop, v2.0 via an intermediate tag object."""
+        repo.write("a.txt")
+        c = repo.commit("release prep")
+        repo.tag("v1.0", annotated=False)
+        repo.tag("v2.0", annotated=True, message="rel")
+        tag_obj = repo.rev_parse("refs/tags/v2.0")  # annotated -> tag object SHA
+        commit_via_tag = repo.rev_parse("v2.0^{commit}")
+        assert tag_obj != c and commit_via_tag == c
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "refs/tags/v1.0", "refs/tags/v2.0", tag_obj, c}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c, "branch"),
+            ("refs/tags/v1.0", c, "tag"),
+            ("refs/tags/v2.0", tag_obj, "tag"),
+            (tag_obj, c, "commit"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "tags")
+
+
+# ---------------------------------------------------------------------------
+# EP 14 -- Binary Search Your Bug: git bisect
+#
+# Mode: normal.  During an active bisect session git writes BISECT_HEAD at the
+# commit currently under test; visigit surfaces it as a ref node (with no edge
+# label, like other pseudo-refs).
+# ---------------------------------------------------------------------------
+
+
+class TestEP14BisectFull:
+    def test_bisect_head_at_midpoint(self, repo: RepoTools) -> None:
+        """--no-checkout: HEAD stays on main; BISECT_HEAD marks the midpoint commit."""
+        repo.write("a.txt")
+        c1 = repo.commit("c1")
+        repo.write("b.txt")
+        c2 = repo.commit("c2")
+        repo.write("c.txt")
+        c3 = repo.commit("c3")
+        repo._run(["git", "bisect", "start", "--no-checkout"])
+        repo._run(["git", "bisect", "bad", c3])
+        repo._run(["git", "bisect", "good", c1])
+        midpoint = repo.rev_parse("BISECT_HEAD")
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {"HEAD", "refs/heads/main", "BISECT_HEAD", c1, c2, c3}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c3, "branch"),
+            ("BISECT_HEAD", midpoint, ""),
+            (c3, c2, "parent"),
+            (c2, c1, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "bisect")
+
+
+# ---------------------------------------------------------------------------
+# EP 15 -- Two Branches, One Checkout: git worktree
+#
+# Mode: branch.  A branch checked out in a linked worktree is annotated with
+# '[wt: <path>]' in its node LABEL; the main-worktree branch is not annotated.
+# ---------------------------------------------------------------------------
+
+
+class TestEP15WorktreeFull:
+    def test_linked_worktree_annotation_in_label(self, repo: RepoTools) -> None:
+        """feature (checked out in a linked worktree) gets [wt: path]; main does not.
+
+        Topology: feature is ahead of main, so main -> fork(base) -> feature.
+        """
+        repo.write("a.txt")
+        repo.commit("base")
+        base = repo.rev_parse("main")
+        repo.checkout("feature", new=True)
+        repo.write("b.txt")
+        repo.commit("feature work")
+        repo.checkout("main")
+        wt_path = repo.path.parent / (repo.path.name + "-wt")
+        repo._run(["git", "worktree", "add", str(wt_path), "feature"])
+
+        nodes, edges, labels, _ = build_with_labels(str(repo.path), mode="branch")
+        expected_nodes = {"main", "feature", base}
+        expected_edges = {(base, "feature", ""), ("main", base, "")}
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "worktree topology")
+        # Label checks: the worktree annotation lives in the feature node's label.
+        assert "[wt:" in labels["feature"], (
+            f"feature label missing wt annotation: {labels['feature']!r}"
+        )
+        assert wt_path.as_posix() in labels["feature"]
+        assert "[wt:" not in labels["main"], f"main must not be wt-annotated: {labels['main']!r}"
+        assert labels["main"] == "HEAD->main"
+
+
+# ---------------------------------------------------------------------------
+# EP 16 -- Force Push Is Destroying Someone's History
+#
+# Mode: normal.  Local main and origin/main point at different commits (diverged).
+# A force push moves origin/main to the local commit; the teammate's commit is
+# orphaned from origin/main but stays visible via FETCH_HEAD (last fetched).
+# ---------------------------------------------------------------------------
+
+
+class TestEP16ForcePushFull:
+    def _diverged(self, repo: RepoTools) -> tuple[str, str, str]:
+        import subprocess as sp
+
+        repo.write("base.txt")
+        base = repo.commit("base")
+        remote_path = repo.path.parent / (repo.path.name + "_remote.git")
+        sp.check_call(
+            ["git", "init", "--bare", "-b", "main", str(remote_path)],
+            stdout=sp.DEVNULL,
+            stderr=sp.DEVNULL,
+        )
+        repo._run(["git", "remote", "add", "origin", str(remote_path)])
+        repo._run(["git", "push", "-u", "origin", "main"])
+        clone = repo.path.parent / (repo.path.name + "_clone")
+        sp.check_call(
+            ["git", "clone", "--branch", "main", str(remote_path), str(clone)],
+            stdout=sp.DEVNULL,
+            stderr=sp.DEVNULL,
+        )
+        for cfg in (["user.email", "t@t"], ["user.name", "T"]):
+            sp.check_call(["git", "config", *cfg], cwd=clone, stderr=sp.DEVNULL)
+        (clone / "tm.txt").write_text("tm")
+        sp.check_call(["git", "add", "-A"], cwd=clone, stderr=sp.DEVNULL)
+        sp.check_call(["git", "commit", "-m", "tm"], cwd=clone, stderr=sp.DEVNULL)
+        sp.check_call(
+            ["git", "push", "origin", "main"], cwd=clone, stdout=sp.DEVNULL, stderr=sp.DEVNULL
+        )
+        tm = sp.check_output(["git", "rev-parse", "HEAD"], cwd=clone).decode().strip()
+        repo._run(["git", "fetch", "origin"])
+        repo.write("local.txt")
+        loc = repo.commit("local-only")
+        return base, tm, loc
+
+    def test_diverged_state(self, repo: RepoTools) -> None:
+        """Before force push: main -> loc, origin/main -> tm (teammate); FETCH_HEAD -> tm."""
+        base, tm, loc = self._diverged(repo)
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/remotes/origin/main",
+            "FETCH_HEAD",
+            base,
+            tm,
+            loc,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", loc, "branch"),
+            (loc, base, "parent"),
+            ("refs/remotes/origin/main", tm, "remote"),
+            ("FETCH_HEAD", tm, ""),
+            (tm, base, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "diverged")
+
+    def test_force_push_moves_origin_main(self, repo: RepoTools) -> None:
+        """After force push: origin/main -> loc; tm orphaned from origin/main but
+        still shown via FETCH_HEAD (the last-fetched ref, unchanged by the push)."""
+        base, tm, loc = self._diverged(repo)
+        repo._run(["git", "push", "--force", "origin", "main"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="normal")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            "refs/remotes/origin/main",
+            "FETCH_HEAD",
+            base,
+            tm,
+            loc,
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", loc, "branch"),
+            (loc, base, "parent"),
+            ("refs/remotes/origin/main", loc, "remote"),
+            ("FETCH_HEAD", tm, ""),
+            (tm, base, "parent"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "after force push")
+
+
+# ---------------------------------------------------------------------------
+# EP 18 -- Same File, Same SHA: content-addressable storage
+#
+# Mode: verbose.  An unchanged file shares one blob node across commits; a changed
+# file gets a new blob.  Each commit has its own tree.
+# ---------------------------------------------------------------------------
+
+
+class TestEP18ContentAddressableFull:
+    def test_shared_blob_across_two_commits(self, repo: RepoTools) -> None:
+        """README.md (unchanged) is one shared blob node; app.py gets a new blob."""
+        repo.write("README.md", "# shared")
+        repo.write("app.py", "v1")
+        c1 = repo.commit("c1")
+        repo.write("app.py", "v2")
+        c2 = repo.commit("c2")
+        tree1 = repo.rev_parse(f"{c1}^{{tree}}")
+        tree2 = repo.rev_parse(f"{c2}^{{tree}}")
+        readme = repo.rev_parse(f"{c1}:README.md")
+        assert readme == repo.rev_parse(f"{c2}:README.md")  # shared blob
+        app1 = repo.rev_parse(f"{c1}:app.py")
+        app2 = repo.rev_parse(f"{c2}:app.py")
+        assert app1 != app2
+        nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
+        expected_nodes = {"HEAD", "refs/heads/main", c1, c2, tree1, tree2, readme, app1, app2}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+            (c2, tree2, "tree"),
+            (c1, tree1, "tree"),
+            (tree2, app2, "app.py"),
+            (tree2, readme, "README.md"),
+            (tree1, app1, "app.py"),
+            (tree1, readme, "README.md"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "shared blob")
+
+
+# ---------------------------------------------------------------------------
+# EP 19 -- The Staging Area Exposed
+#
+# Mode: verbose.  git add writes a blob and records it in the index.  visigit
+# shows Staged / Unstaged / Untracked boxes alongside the committed object graph,
+# and the staged box appears even before the first commit (unborn HEAD).
+# ---------------------------------------------------------------------------
+
+
+class TestEP19StagingFull:
+    def test_three_boxes_with_committed_graph(self, repo: RepoTools) -> None:
+        """Staged, unstaged, and untracked boxes co-exist with the committed object graph."""
+        repo.write("committed.txt", "committed")
+        c = repo.commit("base")
+        tree = repo.rev_parse(f"{c}^{{tree}}")
+        blob = repo.rev_parse(f"{c}:committed.txt")
+        repo.write("committed.txt", "modified")  # unstaged
+        repo.write("staged.txt", "staged")
+        repo._run(["git", "add", "staged.txt"])  # staged
+        repo.write("untracked.txt", "u")  # untracked
+        nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
+        expected_nodes = {
+            "HEAD",
+            "refs/heads/main",
+            c,
+            tree,
+            blob,
+            "Staged Changes",
+            "staged|staged.txt",
+            "Unstaged Changes",
+            "unstaged|committed.txt",
+            "Untracked",
+            "untracked|untracked.txt",
+        }
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c, "branch"),
+            (c, tree, "tree"),
+            (tree, blob, "committed.txt"),
+            ("Staged Changes", "staged|staged.txt", "staged.txt"),
+            ("Unstaged Changes", "unstaged|committed.txt", "committed.txt"),
+            ("Untracked", "untracked|untracked.txt", "untracked.txt"),
+        }
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "three boxes")
+
+    def test_staged_before_first_commit(self, repo: RepoTools) -> None:
+        """Unborn HEAD: a staged file shows just the Staged Changes box (no commit graph,
+        no empty-repo message)."""
+        repo.write("README.md", "# Hello")
+        repo._run(["git", "add", "README.md"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
+        expected_nodes = {"Staged Changes", "staged|README.md"}
+        expected_edges = {("Staged Changes", "staged|README.md", "README.md")}
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "staged unborn")
+
+
+# ---------------------------------------------------------------------------
+# EP 20 -- All the Way Down: git cat-file, .git/objects, Pack Files
+#
+# Mode: verbose.  After git gc packs loose objects, GitPython reads the pack
+# transparently: visigit shows exactly the same object graph, deduplication
+# preserved.
+# ---------------------------------------------------------------------------
+
+
+class TestEP20PackFilesFull:
+    def test_object_graph_unchanged_after_gc(self, repo: RepoTools) -> None:
+        """The full verbose object graph is identical before and after git gc."""
+        repo.write("unchanged.txt", "same")
+        repo.write("changing.txt", "v1")
+        c1 = repo.commit("c1")
+        repo.write("changing.txt", "v2")
+        c2 = repo.commit("c2")
+        tree1 = repo.rev_parse(f"{c1}^{{tree}}")
+        tree2 = repo.rev_parse(f"{c2}^{{tree}}")
+        unchanged = repo.rev_parse(f"{c1}:unchanged.txt")
+        assert unchanged == repo.rev_parse(f"{c2}:unchanged.txt")
+        chg1 = repo.rev_parse(f"{c1}:changing.txt")
+        chg2 = repo.rev_parse(f"{c2}:changing.txt")
+
+        expected_nodes = {"HEAD", "refs/heads/main", c1, c2, tree1, tree2, unchanged, chg1, chg2}
+        expected_edges = {
+            ("HEAD", "refs/heads/main", "HEAD"),
+            ("refs/heads/main", c2, "branch"),
+            (c2, c1, "parent"),
+            (c2, tree2, "tree"),
+            (c1, tree1, "tree"),
+            (tree2, chg2, "changing.txt"),
+            (tree2, unchanged, "unchanged.txt"),
+            (tree1, chg1, "changing.txt"),
+            (tree1, unchanged, "unchanged.txt"),
+        }
+        # Before gc
+        nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "before gc")
+        # After gc -- identical
+        repo._run(["git", "gc", "--quiet"])
+        nodes, edges, _ = full_graph(str(repo.path), mode="verbose")
+        assert_exact(nodes, edges, expected_nodes, expected_edges, "after gc")
