@@ -75,6 +75,17 @@ class GraphBuilder:
             ):
                 self._build_index(dg, graph, index_state)
                 return dg
+            if graph.valid:
+                # Valid repo with no commits yet (unborn HEAD after git init).
+                # The branch ref and HEAD have nothing to point at, so they do not
+                # appear until the first commit -- the graph is intentionally empty.
+                self._add_node(
+                    dg,
+                    "empty-repo",
+                    label="Empty repository\n(no commits yet)",
+                    type_key="ref",
+                )
+                return dg
             self._add_node(dg, "no-repo", label="No git repo found", type_key="ref")
             return dg
 
@@ -121,7 +132,18 @@ class GraphBuilder:
                 type_key = "tag" if ref.is_tag else "ref"
                 label = f"tag\n{ref.name}" if ref.is_tag else ref.name
                 self._add_node(dg, ref_id, label=label, type_key=type_key)
-                edge_label = "branch" if ref.is_branch else "tag" if ref.is_tag else "remote"
+                # Only remote-tracking refs are labelled "remote".  Special pseudo-refs
+                # (ORIG_HEAD, MERGE_HEAD, CHERRY_PICK_HEAD, BISECT_HEAD) are none of
+                # branch/tag/remote and get no edge label -- calling them "remote" was
+                # inaccurate and misleading in lessons.
+                if ref.is_branch:
+                    edge_label = "branch"
+                elif ref.is_tag:
+                    edge_label = "tag"
+                elif ref.is_remote:
+                    edge_label = "remote"
+                else:
+                    edge_label = ""
                 self._add_edge(dg, ref_id, ref.commit_hexsha, label=edge_label)
 
             self._walk_chain(dg, graph, ref.commit_hexsha, rendered_commits, hl)
@@ -218,7 +240,8 @@ class GraphBuilder:
         self._add_node(dg, hexsha, label=label, type_key="commit")
 
         if self.mode == "verbose" and cd and cd.tree_hexsha:
-            self._add_tree_recursive(dg, graph, cd.tree_hexsha, hexsha, hl)
+            # A commit points at its root tree; that edge is always labelled "tree".
+            self._add_tree_recursive(dg, graph, cd.tree_hexsha, hexsha, hl, edge_label="tree")
 
     def _add_tree_recursive(
         self,
@@ -227,19 +250,28 @@ class GraphBuilder:
         tree_hexsha: str,
         parent_id: str,
         hl: int,
+        edge_label: str,
     ) -> None:
-        """Recursively add tree and blob nodes for verbose mode."""
+        """Recursively add tree and blob nodes for verbose mode.
+
+        ``edge_label`` is the label for the parent -> this-tree edge, determined by
+        the CALLER's context: "tree" when the parent is a commit (root tree), or the
+        subdirectory's entry name when the parent is a tree.  This is robust even
+        when one tree object is shared as both a root tree and a subdirectory (e.g.
+        a subtree-merged library), which a name-on-the-node scheme would mislabel.
+        """
+        td = graph.trees.get(tree_hexsha)
+
         if tree_hexsha in self._rendered_nodes:
             # Tree already drawn; still need the edge from this parent
-            self._add_edge(dg, parent_id, tree_hexsha, label="tree")
+            self._add_edge(dg, parent_id, tree_hexsha, label=edge_label)
             return
 
-        td = graph.trees.get(tree_hexsha)
         if td is None:
             return
 
         self._add_node(dg, tree_hexsha, label=f"tree\n{tree_hexsha[:hl]}", type_key="tree")
-        self._add_edge(dg, parent_id, tree_hexsha, label="tree")
+        self._add_edge(dg, parent_id, tree_hexsha, label=edge_label)
 
         for name, blob_hexsha in td.blob_entries:
             self._add_node(dg, blob_hexsha, label=f"blob\n{blob_hexsha[:hl]}", type_key="blob")
@@ -250,8 +282,9 @@ class GraphBuilder:
             self._add_node(dg, node_id, label=f"gitlink\n{commit_hexsha[:hl]}", type_key="blob")
             self._add_edge(dg, tree_hexsha, node_id, label=name)
 
-        for child_tree_hexsha in td.child_tree_hexshas:
-            self._add_tree_recursive(dg, graph, child_tree_hexsha, tree_hexsha, hl)
+        for name, child_tree_hexsha in td.child_tree_entries:
+            # A subdirectory tree edge is labelled with the directory name.
+            self._add_tree_recursive(dg, graph, child_tree_hexsha, tree_hexsha, hl, edge_label=name)
 
     # ------------------------------------------------------------------
     # Index / working tree (verbose mode only)

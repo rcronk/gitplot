@@ -42,6 +42,7 @@ def test_invalid_repo_shows_message():
         head_branch_path=None,
         is_detached=False,
         hash_length=5,
+        valid=False,
     )
     dg = builder.build(empty)
     assert "no-repo" in dg.source or "No git repo found" in dg.source
@@ -80,11 +81,14 @@ def test_empty_repo_verbose_untracked_file_shows_untracked_box(repo: RepoTools):
     assert "no-repo" not in src
 
 
-def test_empty_repo_verbose_no_files_falls_back_to_no_repo(repo: RepoTools):
-    """With nothing staged or untracked, the empty repo still shows the no-repo node."""
+def test_empty_repo_verbose_no_files_shows_empty_repo_message(repo: RepoTools):
+    """A valid repo with no commits and nothing staged/untracked shows the empty-repo
+    message -- NOT 'No git repo found', which would be inaccurate inside a real repo."""
     dg, _, _, _ = _build(str(repo.path), mode="verbose")
     src = dg.source
-    assert "no-repo" in src or "No git repo found" in src
+    assert "empty-repo" in src or "Empty repository" in src
+    assert "no-repo" not in src
+    assert "No git repo found" not in src
 
 
 def test_branch_mode_diverged_shows_fork(repo: RepoTools):

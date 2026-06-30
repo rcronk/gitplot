@@ -54,6 +54,10 @@ System dependency: `graphviz` (`apt install graphviz` / `brew install graphviz`)
 | `tests/test_monitor.py` | Monitor drain and event-filtering tests |
 | `tests/test_repo.py` | GitRepo data-model unit tests |
 | `tests/test_mermaid.py` | Mermaid output unit tests |
+| `tests/test_lessons.py` | Curriculum lesson tests — key node/edge presence per episode |
+| `tests/test_lessons_full.py` | Exhaustive per-lesson tests — exact full node+edge+label set-equality (read off `GraphBuilder._rendered_nodes`/`_rendered_edges`) |
+| `tests/git_oracle.py` | Independent git-plumbing oracle: re-derives the expected verbose graph from `git` subprocess calls (no GitPython/builder) |
+| `tests/test_oracle_differential.py` | Differential tests: visigit verbose output vs `git_oracle` over fixed scenarios + randomly generated repos |
 | `tests/golden/` | Reference DOT/Mermaid snapshots compared by test_e2e.py |
 
 ## Key conventions
