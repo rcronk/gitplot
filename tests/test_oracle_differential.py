@@ -1,14 +1,18 @@
-"""Differential tests: visigit's verbose graph vs an independent git-data oracle.
+"""Differential tests: visigit's graphs vs an independent git-data oracle.
 
-For each repo, we compare visigit's verbose-mode output (GitPython traversal +
-builder walk) against `git_oracle.expected_verbose_graph` (pure git-plumbing,
-a different algorithm).  They must agree exactly on nodes and labelled edges.
+For each repo we compare visigit's output (GitPython traversal + builder walk)
+against ``git_oracle`` (pure git-plumbing, a different algorithm).  They must
+agree exactly.  This catches builder AND repo.py bugs on arbitrary repos --
+including randomly generated ones -- without hand-enumerating expected sets.
 
-This catches builder AND repo.py bugs on arbitrary repos -- including randomly
-generated ones -- without hand-enumerating expected sets per scenario.
+  * normal  -- works on any repo with >=1 commit (clean or dirty; normal mode
+    shows no index boxes).  Includes boring-run collapse.
+  * verbose -- full object graph; needs a CLEAN working tree (no index boxes).
+  * branch  -- topology is a visigit-specific presentation, so we check
+    independent INVARIANTS (fork nodes are real merge-bases) rather than an
+    exact reconstruction.
 
-Oracle scope (see git_oracle): a repo with >=1 commit and a CLEAN working tree
-(no index boxes to model).  Each scenario/generator below ends clean.
+``assert_matches_git`` is the reusable, opt-in helper any test can call.
 """
 
 from __future__ import annotations
@@ -24,24 +28,45 @@ from .conftest import RepoTools
 from .test_lessons_full import assert_exact, full_graph
 
 
-def _check(repo_path: str) -> None:
-    """Assert visigit's verbose graph equals the oracle's for this repo."""
+def assert_matches_git(repo_path: str, mode: str, exclude_remotes: bool = False) -> None:
+    """Opt-in helper: assert visigit's ``mode`` graph equals the git oracle's.
+
+    Eligibility: repo has >=1 commit; for verbose mode the working tree must be
+    clean (the oracle does not model the index boxes).  Any test on an eligible
+    repo can call this for an independent, belt-and-suspenders cross-check.
+    """
     assert git_oracle.has_commit(repo_path), "oracle needs at least one commit"
-    assert git_oracle.working_tree_clean(repo_path), (
-        "oracle models a clean working tree only (no index boxes)"
-    )
-    exp_nodes, exp_edges = git_oracle.expected_verbose_graph(repo_path)
-    nodes, edges, _ = full_graph(repo_path, mode="verbose")
-    assert_exact(nodes, edges, exp_nodes, exp_edges, f"oracle diff @ {repo_path}")
+    if mode == "verbose":
+        assert git_oracle.working_tree_clean(repo_path), (
+            "verbose oracle models a clean working tree only (no index boxes)"
+        )
+    exp_nodes, exp_edges = git_oracle.expected_graph(repo_path, mode, exclude_remotes)
+    nodes, edges, _ = full_graph(repo_path, mode=mode, exclude_remotes=exclude_remotes)
+    assert_exact(nodes, edges, exp_nodes, exp_edges, f"oracle({mode}) @ {repo_path}")
+
+
+def assert_branch_invariants(repo_path: str) -> None:
+    """Independent branch-mode checks: every fork (SHA) node is a real merge-base
+    of some branch pair, and every local branch appears as a node."""
+    nodes, _edges, _ = full_graph(repo_path, mode="branch")
+    sha_nodes = {n for n in nodes if git_oracle._is_sha(n)}
+    merge_bases = git_oracle.all_merge_bases(repo_path)
+    bogus = sha_nodes - merge_bases
+    assert not bogus, f"branch-mode fork nodes that are NOT merge-bases of any branch pair: {bogus}"
+    branches = git_oracle.local_branches(repo_path)
+    missing = branches - nodes
+    assert not missing, f"local branches missing from branch-mode graph: {missing}"
 
 
 # ---------------------------------------------------------------------------
-# Fixed scenarios -- each builds a clean repo exercising a different feature.
+# Scenario builders -- each builds a repo exercising a different feature.
+# CLEAN scenarios end with a clean working tree (eligible for verbose).
+# DIRTY scenarios leave an in-progress/unmerged state (normal mode only).
 # ---------------------------------------------------------------------------
 
 
 def _linear(r: RepoTools) -> None:
-    for i in range(4):
+    for i in range(6):  # enough for a boring run to collapse in normal mode
         r.write(f"f{i}.txt", f"v{i}")
         r.commit(f"c{i}")
 
@@ -80,12 +105,9 @@ def _ff_merge(r: RepoTools) -> None:
 
 
 def _reset_hard(r: RepoTools) -> None:
-    r.write("a.txt")
-    r.commit("a")
-    r.write("b.txt")
-    r.commit("b")
-    r.write("c.txt")
-    r.commit("c")
+    for f in ("a", "b", "c"):
+        r.write(f"{f}.txt")
+        r.commit(f)
     r._run(["git", "reset", "--hard", "HEAD~1"])  # writes ORIG_HEAD
 
 
@@ -178,7 +200,37 @@ def _remote_push(r: RepoTools) -> None:
     r.commit("c2")  # local ahead of origin/main
 
 
-SCENARIOS = {
+def _merge_conflict(r: RepoTools) -> None:
+    r.write("f.txt", "base")
+    r.commit("base")
+    r.checkout("feature", new=True)
+    r.write("f.txt", "feature")
+    r.commit("feature change")
+    r.checkout("main")
+    r.write("f.txt", "main")
+    r.commit("main change")
+    try:
+        r._run(["git", "merge", "feature"])
+    except subprocess.CalledProcessError:
+        pass  # conflict -> MERGE_HEAD, dirty index
+
+
+def _cherry_pick_conflict(r: RepoTools) -> None:
+    r.write("f.txt", "v1")
+    r.commit("init")
+    r.checkout("feature", new=True)
+    r.write("f.txt", "feature")
+    feat = r.commit("feature change")
+    r.checkout("main")
+    r.write("f.txt", "main")
+    r.commit("main diverges")
+    try:
+        r._run(["git", "cherry-pick", feat])
+    except subprocess.CalledProcessError:
+        pass  # conflict -> CHERRY_PICK_HEAD, dirty index
+
+
+CLEAN_SCENARIOS = {
     "linear": _linear,
     "branched": _branched,
     "no_ff_merge": _no_ff_merge,
@@ -194,24 +246,48 @@ SCENARIOS = {
     "remote_push": _remote_push,
 }
 
+DIRTY_SCENARIOS = {
+    "merge_conflict": _merge_conflict,
+    "cherry_pick_conflict": _cherry_pick_conflict,
+}
 
-@pytest.mark.parametrize("name", list(SCENARIOS))
-def test_oracle_matches_visigit_for_scenario(name: str, repo: RepoTools) -> None:
-    SCENARIOS[name](repo)
-    _check(str(repo.path))
+MULTI_BRANCH_SCENARIOS = ["branched", "no_ff_merge", "ff_merge", "rebase", "cherry_pick"]
+
+
+# ---------------------------------------------------------------------------
+# Fixed-scenario differential tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", list(CLEAN_SCENARIOS))
+def test_verbose_oracle_clean_scenarios(name: str, repo: RepoTools) -> None:
+    CLEAN_SCENARIOS[name](repo)
+    assert_matches_git(str(repo.path), "verbose")
+
+
+@pytest.mark.parametrize("name", list(CLEAN_SCENARIOS) + list(DIRTY_SCENARIOS))
+def test_normal_oracle_all_scenarios(name: str, repo: RepoTools) -> None:
+    {**CLEAN_SCENARIOS, **DIRTY_SCENARIOS}[name](repo)
+    assert_matches_git(str(repo.path), "normal")
+
+
+@pytest.mark.parametrize("name", MULTI_BRANCH_SCENARIOS)
+def test_branch_invariants_scenarios(name: str, repo: RepoTools) -> None:
+    CLEAN_SCENARIOS[name](repo)
+    assert_branch_invariants(str(repo.path))
 
 
 # ---------------------------------------------------------------------------
 # Randomly generated repos -- property-based differential check.
 #
-# Each commit writes a UNIQUE file, so merges never conflict and the tree always
-# ends clean.  Exercises commits, branches, switches, no-ff merges, tags, and
+# Each commit writes a UNIQUE file, so merges never conflict and the tree ends
+# clean.  Exercises commits, branches, switches, no-ff merges, tags, and
 # reset --hard (ORIG_HEAD) in random combinations.  Seeds are fixed for
-# reproducibility; a failure prints the seed.
+# reproducibility; a failure prints the seed via the parametrize id.
 # ---------------------------------------------------------------------------
 
 
-def _random_repo(r: RepoTools, seed: int, steps: int = 25) -> None:
+def _random_repo(r: RepoTools, seed: int, steps: int = 30) -> None:
     rng = random.Random(seed)
     branches = ["main"]
     counter = 0
@@ -222,9 +298,9 @@ def _random_repo(r: RepoTools, seed: int, steps: int = 25) -> None:
         r.commit(f"commit {counter}")
         counter += 1
 
-    commit_unique()  # ensure at least one commit
+    commit_unique()
     for _ in range(steps):
-        op = rng.choice(["commit", "commit", "branch", "switch", "merge", "tag", "reset"])
+        op = rng.choice(["commit", "commit", "commit", "branch", "switch", "merge", "tag", "reset"])
         cur = r.current_branch()
         if op == "commit":
             commit_unique()
@@ -239,27 +315,36 @@ def _random_repo(r: RepoTools, seed: int, steps: int = 25) -> None:
         elif op == "merge":
             others = [b for b in branches if b != cur]
             if others:
-                target = rng.choice(others)
                 try:
-                    r.merge(target, no_ff=True)  # unique files -> no conflicts
+                    r.merge(rng.choice(others), no_ff=True)  # unique files -> no conflicts
                 except subprocess.CalledProcessError:
                     pass
         elif op == "tag":
-            tname = f"tag{counter}_{rng.randint(0, 999)}"
-            r.tag(tname, annotated=rng.choice([True, False]), message="m")
+            r.tag(
+                f"tag{counter}_{rng.randint(0, 999)}",
+                annotated=rng.choice([True, False]),
+                message="m",
+            )
         elif op == "reset":
             try:
                 r._run(["git", "reset", "--hard", "HEAD~1"])  # stays clean; writes ORIG_HEAD
             except subprocess.CalledProcessError:
                 pass
-    # Guarantee a clean tree for the oracle (commit anything left over).
     if not git_oracle.working_tree_clean(str(r.path)):
         r._run(["git", "add", "-A"])
         r._run(["git", "commit", "-m", "final", "--allow-empty"])
 
 
+@pytest.mark.parametrize("mode", ["normal", "verbose"])
 @pytest.mark.parametrize("seed", range(20))
-def test_oracle_matches_visigit_for_random_repo(seed: int, tmp_path: Path) -> None:
+def test_oracle_matches_visigit_for_random_repo(mode: str, seed: int, tmp_path: Path) -> None:
     r = RepoTools(tmp_path)
     _random_repo(r, seed)
-    _check(str(r.path))
+    assert_matches_git(str(r.path), mode)
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_branch_invariants_for_random_repo(seed: int, tmp_path: Path) -> None:
+    r = RepoTools(tmp_path)
+    _random_repo(r, seed)
+    assert_branch_invariants(str(r.path))
